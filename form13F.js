@@ -37,7 +37,7 @@ async function getLastFourForm13FHR(cik) {
   let query = {
     query: `formType:13F AND cik:${cik} AND NOT formType:NT`,
     from: '0', // start with first filing. used for pagination/skipping entries
-    size: '4', // limit response to # of filings
+    size: '4', // limit response to # of filings, max 50
     sort: [{ filedAt: { order: 'desc' } }], // sort result by filedAt, newest first
   }
 
