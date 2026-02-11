@@ -35,7 +35,7 @@ async function getLastFourForm13FHR(cik) {
   cik = cik.toString().replace(/^0+/, '');
 
   let query = {
-    query: `formType:13F AND cik:${cik} AND NOT formType:NT`,
+    query: `formType:13F AND cik:${cik} AND NOT formType:NT AND NOT formType:A`,
     from: '0', // start with first filing. used for pagination/skipping entries
     size: '4', // limit response to # of filings, max 50
     sort: [{ filedAt: { order: 'desc' } }], // sort result by filedAt, newest first
@@ -48,7 +48,8 @@ async function getLastFourForm13FHR(cik) {
 function form13FHRtoCSV(formObj) {
   // Generate filename from data
   // formObj.filedAt.split('T')[0] — turn time filed into simple date
-  const filename = `${replaceSpaceWithDashAndRemoveSpecialCharacters(formObj.companyName)}_${formObj.cik}_${formObj.periodOfReport}_${formObj.formType}.csv`
+  // Filter out special characters especially from the form name that could cause errors in saving file
+  const filename = `${formObj.periodOfReport}_${replaceSpaceWithDashAndRemoveSpecialCharacters(formObj.formType)}_${replaceSpaceWithDashAndRemoveSpecialCharacters(formObj.companyName)}_${formObj.cik}.csv`
 
   // Array of holding objects
   const holdings = formObj.holdings
@@ -103,7 +104,7 @@ async function main() {
     let filings = secData.filings
 
     // Creates folder on user's Desktop
-    const filepath = path.join(os.homedir(), 'Desktop', "sec_csv", `${replaceSpaceWithDashAndRemoveSpecialCharacters(filings[0].companyName)}_${filings[0].cik}_${filings[0].formType}_${filings[filings.length - 1].periodOfReport}_to_${filings[0].periodOfReport}`);
+    const filepath = path.join(os.homedir(), 'Desktop', "sec_csv", `${filings[filings.length - 1].periodOfReport}_to_${filings[0].periodOfReport}_${replaceSpaceWithDashAndRemoveSpecialCharacters(filings[0].companyName)}_${filings[0].cik}_${replaceSpaceWithDashAndRemoveSpecialCharacters(filings[0].formType)}.csv`);
 
     fs.mkdirSync(filepath, { recursive: true }, (e) => {
       if (e) {
@@ -114,7 +115,7 @@ async function main() {
     })
 
     // Save original json data for reference
-    fs.writeFile(path.join(filepath, `rawData_${replaceSpaceWithDashAndRemoveSpecialCharacters(filings[0].companyName)}_${filings[filings.length - 1].periodOfReport}_to_${filings[0].periodOfReport}.json`), csvData.csv, err => {
+    fs.writeFile(path.join(filepath, `rawData_${replaceSpaceWithDashAndRemoveSpecialCharacters(filings[0].companyName)}_${filings[filings.length - 1].periodOfReport}_to_${filings[0].periodOfReport}.json`), JSON.stringify(secData), err => {
         if (err) {
           console.error(err);
         } else {
