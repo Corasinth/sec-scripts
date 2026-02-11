@@ -1,5 +1,5 @@
 // =======================================MODULES=======================================
-require('dotenv').config()
+require('dotenv').config({quiet: true})
 const fs = require("node:fs")
 const path = require('path');
 const os = require('os')
@@ -10,10 +10,25 @@ const { queryApi } = require('sec-api');
 const API_KEY = process.env.API_KEY
 queryApi.setApiKey(API_KEY);
 
-cikArray = ["0000928047"]
-
+// cikArray = ["0000928047"]
+const cikArray = processArgs()
 
 // =======================================FUNCTIONS=======================================
+// Takes in arguments and throws an error if there aren't any
+function processArgs() {
+  let cikArray = []
+  
+  for (let i = 2; i < process.argv.length; i++) {
+    cikArray.push(process.argv[i])
+  }
+
+  if (cikArray.length === 0) {
+    console.error("\nPlease add as space-seperated arguments the CIK numbers of the companies you are interested\n\nAs follows: node form13F.js ########## ########## ##########\n")
+    process.exit()
+  }
+  return cikArray
+}
+
 // Makes api request; returns json result
 async function getLastFourForm13FHR(cik) {
   // Trims leading 0s from CIK for query formatting
@@ -87,10 +102,8 @@ async function main() {
     // const secData = JSON.parse(fs.readFileSync("./output.json"))
     let filings = secData.filings
 
-
-
     // Creates folder on user's Desktop
-    const filepath = path.join(os.homedir(), 'Desktop', "sec_csv", `${replaceSpaceWithDashAndRemoveSpecialCharacters(filings[0].companyName)}_${filings[0].cik}_LastFour${filings[0].formType}`);
+    const filepath = path.join(os.homedir(), 'Desktop', "sec_csv", `${replaceSpaceWithDashAndRemoveSpecialCharacters(filings[0].companyName)}_${filings[0].cik}_${filings[0].formType}_${filings[filings.length - 1].periodOfReport}_to_${filings[0].periodOfReport}`);
 
     fs.mkdirSync(filepath, { recursive: true }, (e) => {
       if (e) {
@@ -99,8 +112,6 @@ async function main() {
         console.log(`Created folder ${filepath}`)
       }
     })
-
-    console.log("tetst")
 
     // Loop through the filings to process each form
     for (const form of filings) {
