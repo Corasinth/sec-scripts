@@ -15,6 +15,12 @@ clipboardToMatrix(){
     ; Puts proper header for shares
     columnEditedStr := StrReplace(columnEditedStr, "PRN AMT", "SHARES", 1, ,1)
 
+    ; Puts proper header for sharesorprn
+    columnEditedStr := StrReplace(columnEditedStr, "PRN", "SHARESORPRN", 1, ,1)
+
+    ; Puts proper header for nameofissuer
+    columnEditedStr := StrReplace(columnEditedStr, "NAME OF ISSUER", "NAMEOFISSUER", 1, ,1)
+
     ; Creates an array of each of the 'rows' of the spreadsheet
     rowStrArray := StrSplit(columnEditedStr, "`n")
 
@@ -61,7 +67,7 @@ editingJson(json){
 ; Turns the edited JSON array into neatly formatted CSV data
 jsonToCSV(json){
     ; Hardcoding the headers to ensure correct order
-    headers := ["NAME OF ISSUER", "CUSIP", "VALUE", "SHARES", "PRN"]
+    headers := ["NAMEOFISSUER", "CUSIP", "VALUE", "SHARES", "SHARESORPRN"]
     csvString := ""
 
     For header in headers{
