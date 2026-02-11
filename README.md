@@ -36,7 +36,12 @@ Once you have a terminal window open in the folder containing this script, enter
 
 You can then run this script by entering the command `node form13F.js ########## ##########`, where the `##########`'s stand in for the CIK numbers of the companies whose 13F-HR forms you want. The script will then save the relevant `.csv` files onto your Desktop in a folder called `sec_csv`. By default, the query returns the last four filings of form 13F-HR, though it may return fewer if fewer than four filings for the company exist.
 
-Because this script uses a free, but limited service, it can only make a limited number of queries. Each CIK number you enter uses one query, and while the script can take as many CIK numbers as you wish, it will be unable to complete more than 100 queries per free API key. Currently, no more than 80 queries remain. 
+Because this script uses a free, but limited service, it can only make a limited number of queries. Each CIK number you enter uses one query, and while the script can take as many CIK numbers as you wish, it will be unable to complete more than 100 queries per free API key. 
+
+You will need an API key from [the website providing this API service](https://sec-api.io/pricing). It should be placed in a file named `.env` in the same folder as this `.js` script, as so:
+```
+API_KEY = "Paste Key Here"
+```
 
 ## Contributing
 
