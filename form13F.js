@@ -113,6 +113,15 @@ async function main() {
       }
     })
 
+    // Save original json data for reference
+    fs.writeFile(path.join(filepath, `rawData_${replaceSpaceWithDashAndRemoveSpecialCharacters(filings[0].companyName)}_${filings[filings.length - 1].periodOfReport}_to_${filings[0].periodOfReport}.json`), csvData.csv, err => {
+        if (err) {
+          console.error(err);
+        } else {
+          // file written successfully
+        }
+      });
+
     // Loop through the filings to process each form
     for (const form of filings) {
       // Returns in format {filename: "filename", csv: "csvString"}
@@ -127,7 +136,6 @@ async function main() {
       });
     }
   }
-
   console.log("Finished")
 }
 
