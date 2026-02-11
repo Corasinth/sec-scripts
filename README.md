@@ -34,7 +34,7 @@ Open a terminal window in the folder that contains this script. You can do that 
 
 Once you have a terminal window open in the folder containing this script, enter `npm install` to install necessary modules. 
 
-You can then run this script by entering the command `node form13F.js ########## ##########`, where the `##########`s stand in for the CIK numbers of the companies whose 13F-HR forms you want. The script will then save the relevant `.csv` files onto your Desktop in a folder called `sec_csv`. By default, the query returns the last four filings of form 13F-HR, though it may return fewer if fewer than four filings for the company exist.
+You can then run this script by entering the command `node form13F.js ########## ##########`, where the `##########`'s stand in for the CIK numbers of the companies whose 13F-HR forms you want. The script will then save the relevant `.csv` files onto your Desktop in a folder called `sec_csv`. By default, the query returns the last four filings of form 13F-HR, though it may return fewer if fewer than four filings for the company exist.
 
 Because this script uses a free, but limited service, it can only make a limited number of queries. Each CIK number you enter uses one query, and while the script can take as many CIK numbers as you wish, it will be unable to complete more than 100 queries per free API key. Currently, no more than 80 queries remain. 
 
