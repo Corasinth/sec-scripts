@@ -17,7 +17,7 @@ databaseInputBox := InputBox("Please input the name of the main database table",
 secInputBox := InputBox("Please input the name of the new table", "SQL Command Generator")
 
 ; Formats the SQL command with the correct table names
-sqlCommand := Format(sqlcommandTemplate, [databaseInputBox.Value, secInputBox.Value])
+sqlCommand := Format(sqlcommandTemplate, databaseInputBox.Value, secInputBox.Value)
 
 ; Copies command to clipboard and creates notification
 A_Clipboard := sqlCommand
