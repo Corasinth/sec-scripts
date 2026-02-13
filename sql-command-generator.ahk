@@ -1,5 +1,6 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
+CoordMode("ToolTip", "Screen")
 
 ; This is the name of the main table 
 ; You can change it to change the default entry in the dialogue box that pops up asking for the main database name
