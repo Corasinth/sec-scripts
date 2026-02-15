@@ -32,13 +32,33 @@ This script saves data from the four most recent 13F-HR filings of requested com
 
 To run this script, you need to first install [Node](https://nodejs.org/en/download). Then, download and extract this zipfile. 
 
-You then need to ensure that the folder containing this script holds a file called `database.csv`. This file must be contain comma seperated values, with escaped strings held in quotes. The data must contain at least three columns, the first two of which are the name of the issuing company and the company's CUSIP number (in full). The file must have a header row. Failure of any of these conditions will result in an error or incorrect output.
+You then need to ensure that the folder containing this script holds a file called `database.csv`. This file must contain comma seperated values, with escaped strings held in quotes. The data must contain at least three columns, the first two of which are the name of the issuing company and the company's CUSIP number (in full). The file must have a header row. Failure of any of these conditions will result in an error or incorrect output.
 
-Open a terminal window in the folder that contains this script. You can do that by opening any terminal, like Powershell or Command Prompt, and navigating to this folder using the `cd` command. For example, you can type `cd ~/Desktop` and press enter to navigate to your Desktop folder. You can then use `cd ./FOLDERNAME` to navigate to a specific folder, or `cd ../` to go to the folder your current folder is in. You can also use Tab to autocomplete folder names, and the `ls` command to verify you are in the correct place.
+Open a terminal window in the folder that contains this script. You can do that by opening any terminal, like Powershell or Command Prompt, and navigating to this folder using the `cd` command. For example, this command will take you to your Desktop:
+```shell
+cd ~/Desktop
+``` 
+You can then use `cd ./FOLDERNAME` to navigate to a specific folder, or `cd ../` to go to the folder your current folder is in.
+```shell
+cd ../
+```
+You can also use Tab to autocomplete folder names, and the `ls` command to verify you are in the correct place.
+```shell
+ls 
+```
 
 Once you have a terminal window open in the folder containing this script, enter `npm install` to install necessary modules. 
+```
+npm install
+```
 
-You can then run this script by entering the command `node form13F.js ########## ##########`, where the `##########`'s stand in for the CIK numbers of the companies whose 13F-HR forms you want. The script will then save the relevant SEC data `.csv` files onto your Desktop in the folder called `sec_csv/Form_13F-HR`. It will save the analyzed data in the folder `sec_csv/Queried_Data`. By default, the query returns the last four filings of form 13F-HR, though it may return fewer if fewer than four filings for the company exist.
+You can then run this script by entering the command `node form13F.js ########## ##########`, where the `##########`'s stand in for the CIK numbers of the companies whose 13F-HR forms you want. 
+
+```
+node form13F.js
+```
+
+The script will then save the relevant SEC data `.csv` files onto your Desktop in the folder called `sec_csv/Form_13F-HR`. It will save the analyzed data in the folder `sec_csv/Queried_Data`. By default, the query returns the last four filings of form 13F-HR, though it may return fewer if fewer than four filings for the company exist.
 
 Because this script uses a free, but limited service, it can only make a limited number of queries. Each CIK number you enter uses one query, and while the script can take as many CIK numbers as you wish, it will be unable to complete more than 100 queries per free API key. 
 
