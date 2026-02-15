@@ -28,7 +28,7 @@ This script also requires the installation of [AutoHotKeyScript v2](https://www.
 
 ### Script: form13F.js
 
-This script takes data from the most recent 4 filings of a company's SEC Form 13F-HR and compares them with a `.csv` file of relevant investments before saving the 13F-HR forms and a joined table of data to your desktop as `.csv` files.
+This script saves data from the four most recent 13F-HR filings of requested companies to your Desktop. It also compares them with a `database.csv` file of investments of interest and saves a joined table of the 13F-HR filings and that `database.csv` investment data to your desktop as `.csv` files.
 
 To run this script, you need to first install [Node](https://nodejs.org/en/download). Then, download and extract this zipfile. 
 
