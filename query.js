@@ -5,6 +5,8 @@ const path = require('path');
 const os = require('os')
 const { queryApi } = require('sec-api');
 // =======================================QUERIES=======================================
+const testCusip = ""
+
 
 // Query to grab form 13F-HR for a specified cik
 // const query = {
@@ -16,10 +18,10 @@ const { queryApi } = require('sec-api');
 
 
 const query = {
-    query: `formType:13F AND cik:${cik} AND NOT formType:NT AND NOT formType:A`,
-    from: '0', // start with first filing. used for pagination/skipping entries
-    size: '4', // limit response to # of filings, max 50
-    sort: [{ filedAt: { order: 'desc' } }], // sort result by filedAt, newest first
+    query: `formType:13F AND holdings.cusip:${testCusip}`,
+    from: "0",
+    size: "50",
+    sort: [{ filedAt: { order: 'desc' } }]
 }
 
 
