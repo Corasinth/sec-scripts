@@ -58,9 +58,9 @@ You can then run this script by entering the command `node form13F.js ##########
 node form13F.js
 ```
 
-The script will then save the relevant SEC data `.csv` files onto your Desktop in the folder called `sec_csv/Form_13F-HR`. It will save the analyzed data in the folder `sec_csv/Queried_Data`. By default, the query returns the last four filings of form 13F-HR, though it may return fewer if fewer than four filings for the company exist.
+The script will then save the relevant SEC data `.csv` files onto your Desktop in the folder called `sec_csv/Form_13F-HR`. It will save the analyzed data in the folder `sec_csv/Queried_Data`. The query returns filings of form 13F-HR for the last 12 months of periods of reports.
 
-Because this script uses a free, but limited service, it can only make a limited number of queries. Each CIK number you enter uses one query, and while the script can take as many CIK numbers as you wish, it will be unable to complete more than 100 queries per free API key. 
+Because this script uses a free, but limited service, it can only make a limited number of queries. Every 10 CIK numbers you enter (rounded up) uses one query, and while the script can take as many CIK numbers as you wish, it will be unable to complete more than 100 queries (1000 CIK numbers) per free API key. 
 
 You will need an API key from [the website providing this API service](https://sec-api.io/pricing). It should be placed in a file named `.env` in the same folder as this `.js` script, as so:
 ```
