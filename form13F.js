@@ -16,7 +16,7 @@ const { headerArray, databaseMatrix } = getHeadersAndMatrix()
 const mainDatabaseObject = getDatabaseObj(databaseMatrix)
 const date = new Date()
 const endDate = date.toISOString().split('T')[0]
-const startDate = `${new Date(date.setFullYear(date.getFullYear()-1,date.getMonth(),date.getDate())).toISOString().split('T')[0]}`
+const startDate = `${new Date(date.setFullYear(date.getFullYear() - 1, date.getMonth(), date.getDate())).toISOString().split('T')[0]}`
 // cikArray = ["0000928047"]
 const cikArray = processArgs()
 // (formType:13F AND NOT formType:NT AND NOT formType:A AND periodOfReport:[2025-01-01 TO 2025-12-31]) AND (cik:928047 OR cik:1094584 OR cik:1046192)
@@ -27,14 +27,14 @@ function processArgs() {
   let cikArray = []
   let tempCikArray = process.argv.slice(2)
   let tempCikStr = ""
-  
+
   // Creates a comma+space seperated string of trimmed CIK numbers to create an array of query strings
   for (let i = 0; i < tempCikArray.length; i++) {
     // Trims leading 0s from CIK for query formatting
     let cik = `${tempCikArray[i].toString().replace(/^0+/, '')}`
     tempCikStr += cik
 
-    if((i % 10 === 0 && i !== 0) || i === tempCikArray.length - 1){
+    if ((i % 10 === 0 && i !== 0) || i === tempCikArray.length - 1) {
       cikArray.push(`(formType:13F AND NOT formType:NT AND NOT formType:A AND periodOfReport:[${startDate} TO ${endDate}]) AND (cik:(${tempCikStr}))`)
       tempCikStr = ""
     } else {
@@ -177,7 +177,7 @@ function form13FHRtoCSV(formObj) {
     csvString += holding.votingAuthority.None
     csvString += ','
     csvString += `\"${holding.otherManager}\"`
-  
+
 
     csvString += '\n'
   }
@@ -238,12 +238,12 @@ function processFormDataWithDatabase(form) {
   return { filename: filename, csv: csvString }
 }
 
-async function createFoldersAndFilePaths(form){
+async function createFoldersAndFilePaths(form) {
   // Creates file paths
   const secFormFilepath = path.join(os.homedir(), 'Desktop', "sec_csv", "Form13F-HR", `${startDate}_to_${endDate}_${replaceSpaceWithDashAndRemoveSpecialCharacters(form.companyName)}_${form.cik}_${replaceSpaceWithDashAndRemoveSpecialCharacters(form.formType)}.csv`);
 
   const queriedDataFilepath = path.join(os.homedir(), 'Desktop', "sec_csv", "Queried_Data", `${startDate}_to_${endDate}_${replaceSpaceWithDashAndRemoveSpecialCharacters(form.companyName)}_${form.cik}_Divestment_Analysis.csv`);
-  
+
   // Creates folder on user's Desktop for forms
   fs.mkdirSync(secFormFilepath, { recursive: true }, (e) => {
     if (e) {
@@ -261,7 +261,7 @@ async function createFoldersAndFilePaths(form){
       // console.log(`Created folder ${queriedDataFilepath}`)
     }
   })
-  return {secFormFilepath: secFormFilepath, queriedDataFilepath: queriedDataFilepath}
+  return { secFormFilepath: secFormFilepath, queriedDataFilepath: queriedDataFilepath }
 }
 
 function replaceSpaceWithDashAndRemoveSpecialCharacters(string) {
@@ -272,53 +272,53 @@ function replaceSpaceWithDashAndRemoveSpecialCharacters(string) {
 // =======================================MAIN=======================================
 // Loops through companies, creating folders, running data processing functions, and recording data to .csv files
 async function main() {
-  let fullJSON = {filings: []}
+  let fullJSON = { filings: [] }
   process.stdout.write("\r\x1b[K")
   process.stdout.write(`Processing 13F-HR filings...`)
   // Loop through CIK numbers & request/process data for each
   for (const queryStr of cikArray) {
-  // Grab full filings object
-  const secData = await getForm13FHR(queryStr)
-  // Test Data
-  // const secData = JSON.parse(fs.readFileSync("./testData.json"))
-  let filings = secData.filings
-  fullJSON.filings.push(filings)
+    // Grab full filings object
+    const secData = await getForm13FHR(queryStr)
+    // Test Data
+    // const secData = JSON.parse(fs.readFileSync("./testData.json"))
+    let filings = secData.filings
+    fullJSON.filings.push(filings)
 
-  // Loop through the filings to process each form
-  for (const form of filings) {
-    const {secFormFilepath, queriedDataFilepath} = await createFoldersAndFilePaths(form)
+    // Loop through the filings to process each form
+    for (const form of filings) {
+      const { secFormFilepath, queriedDataFilepath } = await createFoldersAndFilePaths(form)
 
-    // Returns in format {filename: "filename", csv: "csvString"}
-    const csvData = form13FHRtoCSV(form)
+      // Returns in format {filename: "filename", csv: "csvString"}
+      const csvData = form13FHRtoCSV(form)
 
-    // Returns in format {filename: "filename", csv: "csvString"}
-    const queriedData = processFormDataWithDatabase(form)
+      // Returns in format {filename: "filename", csv: "csvString"}
+      const queriedData = processFormDataWithDatabase(form)
 
-    fs.writeFileSync(path.join(secFormFilepath, csvData.filename), csvData.csv, err => {
-      if (err) {
-        console.error(err);
-      } else {
-        // file written successfully
-      }
-    });
-
-    // Only writes file if data exists
-    if (queriedData.csv) {
-      fs.writeFileSync(path.join(queriedDataFilepath, queriedData.filename), queriedData.csv, err => {
+      fs.writeFileSync(path.join(secFormFilepath, csvData.filename), csvData.csv, err => {
         if (err) {
           console.error(err);
         } else {
           // file written successfully
         }
       });
-    }
 
-  }
+      // Only writes file if data exists
+      if (queriedData.csv) {
+        fs.writeFileSync(path.join(queriedDataFilepath, queriedData.filename), queriedData.csv, err => {
+          if (err) {
+            console.error(err);
+          } else {
+            // file written successfully
+          }
+        });
+      }
+
+    }
   }
 
   tempArr = []
-  for(let arr of fullJSON.filings){
-    for(let filing of arr){
+  for (let arr of fullJSON.filings) {
+    for (let filing of arr) {
       tempArr.push(filing)
     }
   }
