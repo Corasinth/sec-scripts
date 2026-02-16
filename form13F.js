@@ -14,22 +14,39 @@ const databaseCSVPath = "./database.csv"
 // Get headers and turn database .csv file into more easily usable object
 const { headerArray, databaseMatrix } = getHeadersAndMatrix()
 const mainDatabaseObject = getDatabaseObj(databaseMatrix)
+const date = new Date()
+const endDate = date.toISOString().split('T')[0]
+const startDate = `${new Date(date.setFullYear(date.getFullYear()-1,date.getMonth(),date.getDate())).toISOString().split('T')[0]}`
 // cikArray = ["0000928047"]
 const cikArray = processArgs()
+// (formType:13F AND NOT formType:NT AND NOT formType:A AND periodOfReport:[2025-01-01 TO 2025-12-31]) AND (cik:928047 OR cik:1094584 OR cik:1046192)
 
 // =======================================FUNCTIONS=======================================
-// Takes in arguments and throws an error if there aren't any
+// Takes in arguments, throws an error if there aren't any, and generates query strings used for API calls
 function processArgs() {
   let cikArray = []
+  let tempCikArray = process.argv.slice(2)
+  let tempCikStr = ""
+  
+  // Creates a comma+space seperated string of trimmed CIK numbers to create an array of query strings
+  for (let i = 0; i < tempCikArray.length; i++) {
+    // Trims leading 0s from CIK for query formatting
+    let cik = `${tempCikArray[i].toString().replace(/^0+/, '')}`
+    tempCikStr += cik
 
-  for (let i = 2; i < process.argv.length; i++) {
-    cikArray.push(process.argv[i])
+    if((i % 10 === 0 && i !== 0) || i === tempCikArray.length - 1){
+      cikArray.push(`(formType:13F AND NOT formType:NT AND NOT formType:A AND periodOfReport:[${startDate} TO ${endDate}]) AND (cik:(${tempCikStr}))`)
+      tempCikStr = ""
+    } else {
+      tempCikStr += ", "
+    }
   }
 
   if (cikArray.length === 0) {
     console.error("\nPlease add as space-seperated arguments the CIK numbers of the companies you are interested\n\nAs follows: node form13F.js ########## ########## ##########\nThe script will now exit.")
     process.exit()
   }
+
   return cikArray
 }
 
@@ -96,15 +113,12 @@ function getDatabaseObj(databaseMatrix) {
 }
 
 // Makes api request; returns json result
-async function getForm13FHR(cik) {
-  // Trims leading 0s from CIK for query formatting
-  cik = cik.toString().replace(/^0+/, '');
-
+async function getForm13FHR(queryStr) {
   let query = {
-    query: `formType:13F AND cik:${cik} AND NOT formType:NT AND NOT formType:A`,
+    query: `${queryStr}`,
     from: '0', // start with first filing. used for pagination/skipping entries
-    size: '4', // limit response to # of filings, max 50
-    sort: [{ filedAt: { order: 'desc' } }], // sort result by filedAt, newest first
+    size: '50', // limit response to # of filings, max 50
+    sort: [{ periodOfReport: { order: 'desc' } }], // sort result by filedAt, newest first
   }
 
   return await queryApi.getFilings(query);
@@ -122,7 +136,7 @@ function form13FHRtoCSV(formObj) {
 
   // Hardcoding CSV headers because header names are not the same as object keys in the data
   // let headers = ["nameOfIssuer", "cusip", "value", "shares", "SharesOrPRN"]
-  let headers = ["name_Of_Issuer", "cusip", "cik", "title_of_class", "value", "shares/prn_amt", "SharesOrPRN", "investment_discretion", "voting_authority_sole", "voting_authority_shared", "voting_authority_none", "other_manager", "ticker"]
+  let headers = ["name_Of_Issuer", "ticker", "cusip", "cik", "title_of_class", "value", "shares/prn_amt", "SharesOrPRN", "investment_discretion", "voting_authority_sole", "voting_authority_shared", "voting_authority_none", "other_manager"]
 
   let csvString = ""
   // Creates header row for CSV
@@ -139,6 +153,8 @@ function form13FHRtoCSV(formObj) {
   for (const holding of holdings) {
     // Hard coding these in the desired order—less flexible but easier to edit and move around
     csvString += holding.nameOfIssuer
+    csvString += ','
+    csvString += holding.ticker
     csvString += ','
     csvString += holding.cusip
     csvString += ','
@@ -161,8 +177,7 @@ function form13FHRtoCSV(formObj) {
     csvString += holding.votingAuthority.None
     csvString += ','
     csvString += `\"${holding.otherManager}\"`
-    csvString += ','
-    csvString += holding.ticker
+  
 
     csvString += '\n'
   }
@@ -223,28 +238,13 @@ function processFormDataWithDatabase(form) {
   return { filename: filename, csv: csvString }
 }
 
-function replaceSpaceWithDashAndRemoveSpecialCharacters(string) {
-  return string.replace(/\s+/g, '-').replace(/[^0-9a-z]/gi, "")
-}
+async function createFoldersAndFilePaths(form){
+  // Creates file paths
+  const secFormFilepath = path.join(os.homedir(), 'Desktop', "sec_csv", "Form13F-HR", `${startDate}_to_${endDate}_${replaceSpaceWithDashAndRemoveSpecialCharacters(form.companyName)}_${form.cik}_${replaceSpaceWithDashAndRemoveSpecialCharacters(form.formType)}.csv`);
 
-
-// =======================================MAIN=======================================
-// Loops through companies, creating folders, running data processing functions, and recording data to .csv files
-async function main() {
-  // Loop through CIK numbers & request/process data for each
-  for (const cik of cikArray) {
-  process.stdout.write("\r\x1b[K")
-  process.stdout.write(`Processing 13F-HR filings for company #${cik}...`)
-
-  // Grab full filings object
-  const secData = await getForm13FHR(cik)
-  // Test Data
-  // const secData = JSON.parse(fs.readFileSync("./testData.json"))
-  let filings = secData.filings
-
+  const queriedDataFilepath = path.join(os.homedir(), 'Desktop', "sec_csv", "Queried_Data", `${startDate}_to_${endDate}_${replaceSpaceWithDashAndRemoveSpecialCharacters(form.companyName)}_${form.cik}_Divestment_Analysis.csv`);
+  
   // Creates folder on user's Desktop for forms
-  const secFormFilepath = path.join(os.homedir(), 'Desktop', "sec_csv", "Form_13F-HR", `${filings[filings.length - 1].periodOfReport}_to_${filings[0].periodOfReport}_${replaceSpaceWithDashAndRemoveSpecialCharacters(filings[0].companyName)}_${filings[0].cik}_${replaceSpaceWithDashAndRemoveSpecialCharacters(filings[0].formType)}.csv`);
-
   fs.mkdirSync(secFormFilepath, { recursive: true }, (e) => {
     if (e) {
       console.error(e)
@@ -253,18 +253,7 @@ async function main() {
     }
   })
 
-  // Save original json data for reference
-  fs.writeFile(path.join(secFormFilepath, `rawData_${replaceSpaceWithDashAndRemoveSpecialCharacters(filings[0].companyName)}_${filings[filings.length - 1].periodOfReport}_to_${filings[0].periodOfReport}.json`), JSON.stringify(secData), err => {
-    if (err) {
-      console.error(err);
-    } else {
-      // file written successfully
-    }
-  });
-
   // Creates folder on user's Desktop for analyzed data
-  const queriedDataFilepath = path.join(os.homedir(), 'Desktop', "sec_csv", "Queried_Data", `${filings[filings.length - 1].periodOfReport}_to_${filings[0].periodOfReport}_${replaceSpaceWithDashAndRemoveSpecialCharacters(filings[0].companyName)}_${filings[0].cik}_Divestment_Analysis.csv`);
-
   fs.mkdirSync(queriedDataFilepath, { recursive: true }, (e) => {
     if (e) {
       console.error(e)
@@ -272,9 +261,33 @@ async function main() {
       // console.log(`Created folder ${queriedDataFilepath}`)
     }
   })
+  return {secFormFilepath: secFormFilepath, queriedDataFilepath: queriedDataFilepath}
+}
+
+function replaceSpaceWithDashAndRemoveSpecialCharacters(string) {
+  return string.replace(/\s+/g, '-').replace(/[^0-9a-z]/gi, "")
+}
+
+
+// =======================================MAIN=======================================
+// Loops through companies, creating folders, running data processing functions, and recording data to .csv files
+async function main() {
+  let fullJSON = {filings: []}
+  process.stdout.write("\r\x1b[K")
+  process.stdout.write(`Processing 13F-HR filings...`)
+  // Loop through CIK numbers & request/process data for each
+  for (const queryStr of cikArray) {
+  // Grab full filings object
+  const secData = await getForm13FHR(queryStr)
+  // Test Data
+  // const secData = JSON.parse(fs.readFileSync("./testData.json"))
+  let filings = secData.filings
+  fullJSON.filings.push(filings)
 
   // Loop through the filings to process each form
   for (const form of filings) {
+    const {secFormFilepath, queriedDataFilepath} = await createFoldersAndFilePaths(form)
+
     // Returns in format {filename: "filename", csv: "csvString"}
     const csvData = form13FHRtoCSV(form)
 
@@ -302,6 +315,24 @@ async function main() {
 
   }
   }
+
+  tempArr = []
+  for(let arr of fullJSON.filings){
+    for(let filing of arr){
+      tempArr.push(filing)
+    }
+  }
+
+  fullJSON.filings = tempArr
+
+  // Save original json data for reference
+  fs.writeFileSync(path.join(os.homedir(), "Desktop", "sec_csv", "Form13F-HR", `rawData_for_${startDate}_to_${endDate}.json`), JSON.stringify(fullJSON), err => {
+    if (err) {
+      console.error(err);
+    } else {
+      // file written successfully
+    }
+  });
   console.log("Finished")
 }
 
