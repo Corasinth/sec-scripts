@@ -1,3 +1,18 @@
+// =======================================DATAFLOW EXPLANATION=======================================
+// When running the script, it is nessecary to add space seperated CIK numbers for the companies you're interested in. The script takes these numbers, trims the leading 0s, splits them into groups of ten, generates a queryStr for the API, and puts them into an array. It does this because the max number of filings that the API returns is 50, and the script is setup to search for 13F-HR files (excluding amendments and 13F-NT files) in the last year, specifically filings with a period of report between when the script was run and exactly 1 year ago. With a filing each quarter, 10 companies produces 40 filings—and the extra ten are just in case we get up to 5 filings/company, for some reason. It may be that the script only produces three filings for the last year as well, due to mismatches in the period of report, but if so this can be fixed by editing how the startDate value is calculated, and by editing the number of CIK numbers grouped together to not exceed the total 50.
+ 
+// The script will take the filing info from these companies and compare them against the ./database.csv file assumed to be in this folder. To turn the csv file into something more useful for data comparisons, each row in the file is converted into a an object entry in a larger object, with the key name being the second column of the database.csv file, assumed to be CUSIP. Additionally, the headers of the columns, assumed to be the first row, are saved as a seperate array and used to both set the keys for the row data and retrieve them later in the correct order. 
+
+// The main script then runs, looping through the cikArray and making a query with each string. For each query result, three things happen. The resulting data is saved to a temporary folder as raw json. Each individual filing from the query is sent to a function that takes the JSON holdings and saves a .csv file of that filing data with a filename that includes the period of report, the form type, the company name, and the company cik number. Each row is manually built out, and the header row is defined by a hardcoded array. Changing the order of the headers requires changing this array AND the order in which each row is built out, since headers for each column are not the same as the keys used to access the data from the API query. 
+
+// And of course, the full query is processed to create the analyzed database csv files. Because the API query returns a list of filings sorted by period of report (latest to oldest—I could not figure out how to have the query sorted by company name or other identifier), the first thing to do is to create an object that holds a series of arrays, one for each company, where the keys are the CIK numbers of those companies. Then, the script loops through that object and sends each company array to be processed. 
+
+// Each filing is looped through, and its period of report saved (newest to oldest). The holdings of each filing are looped through, and saved to an object that duplicates the filing entry, while also adding a new data over time key to the holding object. There, the values, shares, holding type, and period of report are copied to an object labeled by the period of report. Once the script has looped through each filing, compiling the holding data for each one, it loops through the compiled object to create an array that can be sorted alphanumerically by company name. The company name is preferred to come from the database.csv file, since sometimes these differ from the API query data and results in a non-alphabetical output csv file.
+
+// The sorted array is then looped through, each holdings CUSIP number being checked against the database.csv object. Headers are made for the csv string first, producing columns for company name, CUSIP, and then for each period of report a values, shares, and shares comparison column. If there's a match with the database.csv object a new row is added to the csv string by looping through the period of report array made earlier as well as the headers from the database.csv object.
+
+// Lastly, the temp JSON data files are brought into memory collected into one object, and written to a single file before having their temporary folder deleted.
+
 // =======================================MODULES=======================================
 require('dotenv').config({ quiet: true })
 const fs = require("node:fs")
@@ -460,7 +475,7 @@ async function main() {
   }
 
   fs.rmSync(fullFilepath, { recursive: true, force: true });
-  fs.writeFileSync(path.join(os.homedir(), "Desktop", "sec_csv", `rawData_for_13F-HR_${periodOfReportTracker.earliest.toISOString().split("T")[0]}_to_${periodOfReportTracker.latest.toISOString().split("T")[0]}.json`), JSON.stringify(fullJSONFilings), err => {
+  fs.writeFileSync(path.join(os.homedir(), "Desktop", "sec_csv", `rawData_for_13F-HR_${periodOfReportTracker.earliest.toISOString().split("T")[0]}_to_${periodOfReportTracker.latest.toISOString().split("T")[0]}_timestamp_${endDate}.json`), JSON.stringify(fullJSONFilings), err => {
     if (err) {
       console.error(err);
     } else {
