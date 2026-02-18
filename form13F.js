@@ -382,8 +382,6 @@ function replaceSpaceWithDashAndRemoveSpecialCharacters(string) {
 // =======================================MAIN=======================================
 // Loops through companies, creating folders, running data processing functions, and recording data to .csv files
 async function main() {
-  process.stdout.write("\r\x1b[K")
-  process.stdout.write(`Processing 13F-HR filings...`)
   fs.mkdirSync(path.join(os.homedir(), "Desktop", "sec_csv", "tempJSON"), { recursive: true }, (e) => {
     if (e) {
       console.error(e)
@@ -393,6 +391,8 @@ async function main() {
   })
   // Loop through CIK numbers & request/process data for each
   for (let i = 0; i < cikArray.length; i++) {
+    process.stdout.write("\r\x1b[K")
+    process.stdout.write(`Processing 13F-HR filings...query ${i+1}/${cikArray.length}`)
     const queryStr = cikArray[i]
     // Grab full filings object
     const secData = await getForm13FHR(queryStr)
@@ -482,7 +482,8 @@ async function main() {
       // file written successfully
     }
   });
-  console.log("Finished")
+  process.stdout.write("\r\x1b[K")
+  console.log("Processing 13F-HR filings...Finished")
 }
 
 main()
