@@ -444,8 +444,8 @@ async function main() {
     cikArray: process.argv.slice(2),
     startDateOfSearch: startDate,
     endDateOfSearch: endDate,
-    earliestPeriodOfReport: periodOfReportTracker.earliest.toISOString(),
-    latestPeriodOfReport: periodOfReportTracker.latest.toISOString(),
+    earliestPeriodOfReport: periodOfReportTracker.earliest.toISOString().split("T")[0],
+    latestPeriodOfReport: periodOfReportTracker.latest.toISOString().split("T")[0],
     filings: []
   }
 
