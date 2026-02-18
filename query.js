@@ -15,7 +15,6 @@ for (let i = 0; i < testCIKArr.length; i++) {
 
 }
 
-
 let queryStr = `cik:(${testCIK})`
 
 // "formType:13F AND NOT formType:NT AND NOT formType:A AND periodOfReport:[2025-01-01 TO 2025-12-31] AND (928047, 320193, 1065280)"
