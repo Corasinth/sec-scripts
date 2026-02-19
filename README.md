@@ -32,7 +32,7 @@ This script saves data from the four most recent 13F-HR filings of requested com
 
 To run this script, you need to first install [Node](https://nodejs.org/en/download). Then, download and extract this zipfile. 
 
-You then need to ensure that the folder containing this script holds a file called `database.csv`. This file must contain comma seperated values, with escaped strings held in quotes. The data must contain at least three columns, the first two of which are the name of the issuing company and the company's CUSIP number (in full). The file must have a header row. Failure of any of these conditions will result in an error or incorrect output.
+You then need to ensure that the folder containing this script holds a file called `database.csv`. This file must contain comma seperated values, with escaped strings held in quotes. The data is assumed to have a particular set of headers—the first four specifically must be `ISSUER,CUSIP,COUNTRY,ISIN`. Failure of any of these conditions will result in an error or incorrect output.
 
 Open a terminal window in the folder that contains this script. You can do that by opening any terminal, like Powershell or Command Prompt, and navigating to this folder using the `cd` command. For example, this command will take you to your Desktop:
 ```shell
