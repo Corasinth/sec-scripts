@@ -1,6 +1,6 @@
 // =======================================DATAFLOW EXPLANATION=======================================
 // When running the script, it is nessecary to add space seperated CIK numbers for the companies you're interested in. The script takes these numbers, trims the leading 0s, splits them into groups of ten, generates a queryStr for the API, and puts them into an array. It does this because the max number of filings that the API returns is 50, and the script is setup to search for 13F-HR files (excluding amendments and 13F-NT files) in the last year, specifically filings with a period of report between when the script was run and exactly 1 year ago. With a filing each quarter, 10 companies produces 40 filings—and the extra ten are just in case we get up to 5 filings/company, for some reason. It may be that the script only produces three filings for the last year as well, due to mismatches in the period of report, but if so this can be fixed by editing how the startDate value is calculated, and by editing the number of CIK numbers grouped together to not exceed the total 50.
- 
+
 // The script will take the filing info from these companies and compare them against the ./database.csv file assumed to be in this folder. To turn the csv file into something more useful for data comparisons, each row in the file is converted into a an object entry in a larger object, with the key name being the second column of the database.csv file, assumed to be CUSIP. Additionally, the headers of the columns, assumed to be the first row, are saved as a seperate array and used to both set the keys for the row data and retrieve them later in the correct order. 
 
 // The main script then runs, looping through the cikArray and making a query with each string. For each query result, three things happen. The resulting data is saved to a temporary folder as raw json. Each individual filing from the query is sent to a function that takes the JSON holdings and saves a .csv file of that filing data with a filename that includes the period of report, the form type, the company name, and the company cik number. Each row is manually built out, and the header row is defined by a hardcoded array. Changing the order of the headers requires changing this array AND the order in which each row is built out, since headers for each column are not the same as the keys used to access the data from the API query. 
@@ -122,9 +122,23 @@ function getDatabaseObj(databaseMatrix) {
       console.log(`${row[0]} has no CUSIP number!—skipping entry`)
       continue
     }
+
+    let sumSources = ""
     for (let i = 0; i < row.length; i++) {
+      // Collect sources
+
       // Labels each value by the column header, removes line break characters
       cusipObj[row[1]][headerArray[i]] = row[i].replace(/[\n\r]/gm, "")
+
+      // Start at the 5th column for combining sources and end at the 9th
+      if (i >= 4 && i < 9) {
+        sumSources += `${row[i]}`
+        if (i === 8) {
+          cusipObj[row[1]]["sources"] = sumSources
+        } else if (row[i]) {
+          sumSources += ", "
+        }
+      }
     }
   }
   return cusipObj
@@ -273,6 +287,17 @@ function processFormDataWithDatabase(companyFilingArr) {
     return val
   })
 
+  // generate sum values
+  const sumValue = {}
+  for (period of periodOfReportArray) {
+    sumValue[period] = 0
+  }
+
+  const sumImpact = {}
+  for (let i = 9; i < headerArray.length; i++) {
+    sumImpact[headerArray[i]] = 0
+  }
+
   // If the current holding has the same CUSIP as an entry in the database, a row is generated for the csv file joining data from sec-api about the holding and investment data from the database
   // Data is taken to identify the company, then provide value and share data for multiple periods of reports, then fill in row data from the database.csv file
   for (const holding of companyFilingArr) {
@@ -280,7 +305,7 @@ function processFormDataWithDatabase(companyFilingArr) {
       // Generate headers for the .csv form only if there's a match and only if we haven't already made the headers
       if (!madeHeaders) {
         // csvString += "NAME_OF_ISSUER,CUSIP,CIK,VALUE,SHARES_OR_PRN_AMT,SHARES_OR_PRN_TYPE,"
-        csvString += "NAME_OF_ISSUER,CUSIP,"
+        csvString += "NAME_OF_ISSUER,CUSIP,ISIN,COUNTRY,"
 
         // Go oldest to newest, but periodOfReportArray is newest to oldest
         for (let i = periodOfReportArray.length - 1; i > -1; i--) {
@@ -288,15 +313,18 @@ function processFormDataWithDatabase(companyFilingArr) {
 
           csvString += `VALUE_${por},`
           csvString += `SHARES_${por},`
-          csvString += `TYPE,`
+          // csvString += `TYPE,`
 
           if (i !== periodOfReportArray.length - 1) {
             csvString += `SHARES_DIFF_${periodOfReportArray[i + 1]}_TO_${por},`
           }
         }
 
-        // Skipping first two headers
-        for (let i = 2; i < headerArray.length; i++) {
+        // Before main header array stuff
+        csvString += "SOURCES,"
+
+        // Skipping first four headers since those will be included elsewhere
+        for (let i = 4; i < headerArray.length; i++) {
           csvString += headerArray[i]
           if (i < headerArray.length - 1) {
             csvString += ','
@@ -307,12 +335,21 @@ function processFormDataWithDatabase(companyFilingArr) {
       }
 
       // Generate row data
-      // Name of Company form database.csv
-      csvString += `${mainDatabaseObject[holding.cusip][headerArray[0]]}`
+      // Name of Company form database.csv + ticker
+      csvString += `\"${titleCase(mainDatabaseObject[holding.cusip][headerArray[0]].replace(/["'“”‘’]/g, ""))} (${holding.ticker})\"`
       csvString += ','
 
       csvString += holding.cusip
       csvString += ','
+
+      // ISIN—assumed to be the fourth column
+      csvString += mainDatabaseObject[holding.cusip][headerArray[3]] ?? ""
+      csvString += ','
+
+      // Country—assumed to be the third column
+      csvString += mainDatabaseObject[holding.cusip][headerArray[2]] ?? ""
+      csvString += ','
+
       // csvString += holding.cik
       // csvString += ','
 
@@ -321,13 +358,14 @@ function processFormDataWithDatabase(companyFilingArr) {
           holding.dot[periodOfReportArray[i]] = { periodOfReport: false, value: 0, shares: 0, holdingType: "" }
         }
         const por = holding.dot[periodOfReportArray[i]]
+        sumValue[periodOfReportArray[i]] += por["value"]
 
         // Values
-        csvString += `${por["value"]},`
+        csvString += `$${por["value"]},`
         // Shares
         csvString += `${por["shares"]},`
         // Shares or PRN
-        csvString += `${por["holdingType"]},`
+        // csvString += `${por["holdingType"]},`
 
         if (i !== periodOfReportArray.length - 1) {
           // Difference
@@ -335,9 +373,16 @@ function processFormDataWithDatabase(companyFilingArr) {
         }
       }
 
-      // Skip the first two elements of the header array since they're coming from the sec-api data
-      for (let i = 2; i < headerArray.length; i++) {
+      csvString += `\"${mainDatabaseObject[holding.cusip]["sources"]}\",`
+
+      // Skip the first four elements of the header array since they're already in place
+      for (let i = 4; i < headerArray.length; i++) {
         csvString += mainDatabaseObject[holding.cusip][headerArray[i]]
+
+        if ((sumImpact[headerArray[i]] || sumImpact[headerArray[i]] === 0) && mainDatabaseObject[holding.cusip][headerArray[i]] && mainDatabaseObject[holding.cusip][headerArray[i]] !== "?") {
+          sumImpact[headerArray[i]] += 1
+        }
+
         if (i < headerArray.length - 1) {
           csvString += ','
         }
@@ -345,6 +390,24 @@ function processFormDataWithDatabase(companyFilingArr) {
       csvString += '\n'
     }
   }
+
+  // Add totals row
+  csvString += `"","","","",`
+  for (let i = periodOfReportArray.length - 1; i > -1; i--) {
+    csvString += `$${sumValue[periodOfReportArray[i]]},,`
+
+    if (i !== periodOfReportArray.length - 1) {
+      csvString += ","
+    }
+  }
+  csvString += `"","","","","","",`
+
+  for (let i = 9; i < headerArray.length; i++) {
+    csvString += sumImpact[headerArray[i]]
+    csvString += ","
+  }
+  csvString += '\n'
+
   return { filename: filename, csv: csvString }
 }
 
@@ -378,6 +441,13 @@ function replaceSpaceWithDashAndRemoveSpecialCharacters(string) {
   return string.replace(/\s+/g, '-').replace(/[^0-9a-z]/gi, "")
 }
 
+function titleCase(str) {
+  str = str.toLowerCase().split(' ');
+  for (var i = 0; i < str.length; i++) {
+    str[i] = str[i].charAt(0).toUpperCase() + str[i].slice(1);
+  }
+  return str.join(' ');
+}
 
 // =======================================MAIN=======================================
 // Loops through companies, creating folders, running data processing functions, and recording data to .csv files
@@ -392,7 +462,7 @@ async function main() {
   // Loop through CIK numbers & request/process data for each
   for (let i = 0; i < cikArray.length; i++) {
     process.stdout.write("\r\x1b[K")
-    process.stdout.write(`Processing 13F-HR filings...query ${i+1}/${cikArray.length}`)
+    process.stdout.write(`Processing 13F-HR filings...query ${i + 1}/${cikArray.length}`)
     const queryStr = cikArray[i]
     // Grab full filings object
     const secData = await getForm13FHR(queryStr)
