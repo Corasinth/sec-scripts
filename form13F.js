@@ -298,6 +298,15 @@ function processFormDataWithDatabase(companyFilingArr) {
     sumImpact[headerArray[i]] = 0
   }
 
+  const sumImpactValue = {}
+  for (let i = 9; i < headerArray.length; i++) {
+    sumImpactValue[headerArray[i]] = {}
+
+    for (const period of periodOfReportArray) {
+      sumImpactValue[headerArray[i]][period] = 0
+    }
+  }
+
   // If the current holding has the same CUSIP as an entry in the database, a row is generated for the csv file joining data from sec-api about the holding and investment data from the database
   // Data is taken to identify the company, then provide value and share data for multiple periods of reports, then fill in row data from the database.csv file
   for (const holding of companyFilingArr) {
@@ -311,12 +320,12 @@ function processFormDataWithDatabase(companyFilingArr) {
         for (let i = periodOfReportArray.length - 1; i > -1; i--) {
           const por = periodOfReportArray[i]
 
-          csvString += `VALUE_${por},`
-          csvString += `SHARES_${por},`
+          csvString += `Q${getQuarter(por)}_VALUE,`
+          csvString += `Q${getQuarter(por)}_SHARES,`
           // csvString += `TYPE,`
 
           if (i !== periodOfReportArray.length - 1) {
-            csvString += `SHARES_DIFF_${periodOfReportArray[i + 1]}_TO_${por},`
+            csvString += `Q${getQuarter(periodOfReportArray[i + 1])}_TO_Q${getQuarter(por)}_SHARES_DIFF,`
           }
         }
 
@@ -361,7 +370,7 @@ function processFormDataWithDatabase(companyFilingArr) {
         sumValue[periodOfReportArray[i]] += por["value"]
 
         // Values
-        csvString += `$${por["value"]},`
+        csvString += `${por["value"]},`
         // Shares
         csvString += `${por["shares"]},`
         // Shares or PRN
@@ -381,6 +390,12 @@ function processFormDataWithDatabase(companyFilingArr) {
 
         if ((sumImpact[headerArray[i]] || sumImpact[headerArray[i]] === 0) && mainDatabaseObject[holding.cusip][headerArray[i]] && mainDatabaseObject[holding.cusip][headerArray[i]] !== "?") {
           sumImpact[headerArray[i]] += 1
+
+          if (i > 8) {
+            for (const period of periodOfReportArray) {
+              sumImpactValue[headerArray[i]][period] += Number(holding.dot[period]["value"])
+            }
+          }
         }
 
         if (i < headerArray.length - 1) {
@@ -394,17 +409,27 @@ function processFormDataWithDatabase(companyFilingArr) {
   // Add totals row
   csvString += `"","","","",`
   for (let i = periodOfReportArray.length - 1; i > -1; i--) {
-    csvString += `$${sumValue[periodOfReportArray[i]]},,`
+    csvString += `${sumValue[periodOfReportArray[i]]},,`
 
     if (i !== periodOfReportArray.length - 1) {
       csvString += ","
     }
   }
-  csvString += `"","","","","","",`
+  csvString += `\n\n"",TOTALS`
+  for (let i = periodOfReportArray.length - 1; i > - 1; i--) {
+    csvString += `,Q${getQuarter(periodOfReportArray[i])}`
+  }
+  csvString += `\n`
 
   for (let i = 9; i < headerArray.length; i++) {
-    csvString += sumImpact[headerArray[i]]
+    csvString += headerArray[i]
     csvString += ","
+    csvString += sumImpact[headerArray[i]]
+
+    for (let j = periodOfReportArray.length - 1; j > - 1; j--) {
+      csvString += `,${sumImpactValue[headerArray[i]][periodOfReportArray[j]]}`
+    }
+    csvString += `\n`
   }
   csvString += '\n'
 
@@ -449,6 +474,13 @@ function titleCase(str) {
   return str.join(' ');
 }
 
+// https://bobbyhadz.com/blog/javascript-get-date-quarter
+function getQuarter(date) {
+  let d = new Date(date)
+  return Math.floor(d.getMonth() / 3 + 1);
+}
+
+
 // =======================================MAIN=======================================
 // Loops through companies, creating folders, running data processing functions, and recording data to .csv files
 async function main() {
@@ -463,7 +495,7 @@ async function main() {
   for (let i = 0; i < cikArray.length; i++) {
     process.stdout.write("\r\x1b[K")
     process.stdout.write(`Processing 13F-HR filings...query ${i + 1}/${cikArray.length}`)
-    const queryStr = cikArray[i]
+    // const queryStr = cikArray[i]
     // Grab full filings object
     const secData = await getForm13FHR(queryStr)
     // Test Data
