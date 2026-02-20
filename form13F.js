@@ -495,7 +495,7 @@ async function main() {
   for (let i = 0; i < cikArray.length; i++) {
     process.stdout.write("\r\x1b[K")
     process.stdout.write(`Processing 13F-HR filings...query ${i + 1}/${cikArray.length}`)
-    // const queryStr = cikArray[i]
+    const queryStr = cikArray[i]
     // Grab full filings object
     const secData = await getForm13FHR(queryStr)
     // Test Data
