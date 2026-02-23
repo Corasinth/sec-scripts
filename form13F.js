@@ -47,12 +47,12 @@ function processArgs() {
   let tempCikStr = ""
 
   // Creates a comma+space seperated string of trimmed CIK numbers to create an array of query strings
-  for (let i = 0; i < tempCikArray.length; i++) {
+  for (let i = 1; i <= tempCikArray.length; i++) {
     // Trims leading 0s from CIK for query formatting
-    let cik = `${tempCikArray[i].toString().replace(/^0+/, '')}`
+    let cik = `${tempCikArray[i - 1].toString().replace(/^0+/, '')}`
     tempCikStr += cik
 
-    if ((i % 10 === 0 && i !== 0) || i === tempCikArray.length - 1) {
+    if ((i % 10 === 0 && i !== 0) || i === tempCikArray.length) {
       cikArray.push(`(formType:13F AND NOT formType:NT AND NOT formType:A AND periodOfReport:[${startDate} TO ${endDate}]) AND (cik:(${tempCikStr}))`)
       tempCikStr = ""
     } else {
@@ -184,7 +184,7 @@ function form13FHRtoCSV(formObj) {
 
   for (const holding of holdings) {
     // Hard coding these in the desired order—less flexible but easier to edit and move around
-    csvString += holding.nameOfIssuer ?? ""
+    csvString += `\"${holding.nameOfIssuer.replace(/["'“”‘’]/g, "") ?? ""}\"`
     csvString += ','
     csvString += holding.ticker ?? ""
     csvString += ','
@@ -259,7 +259,8 @@ function processFormDataWithDatabase(companyFilingArr) {
 
       if (companyFilingObject[holding.cusip].dot[currentPeriodOfReport]) {
         // If entry for current period of report already exists, there's some funky reporting. This records the multiple entries under the same CUSIP number
-        companyFilingObject[holding.cusip].dot[currentPeriodOfReport] = { periodOfReport: currentPeriodOfReport, value: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].value}/${holding.value}`, shares: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].shares}/${holding.shrsOrPrnAmt.sshPrnamt}`, holdingType: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}/${holding.shrsOrPrnAmt.sshPrnamtType}` }
+        // companyFilingObject[holding.cusip].dot[currentPeriodOfReport] = { periodOfReport: currentPeriodOfReport, value: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].value}/${holding.value}`, shares: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].shares}/${holding.shrsOrPrnAmt.sshPrnamt}`, holdingType: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}/${holding.shrsOrPrnAmt.sshPrnamtType}` }
+        companyFilingObject[holding.cusip].dot[currentPeriodOfReport] = { periodOfReport: currentPeriodOfReport, value: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].value) + Number(holding.value)}`, shares: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].shares) + Number(holding.shrsOrPrnAmt.sshPrnamt)}`, holdingType: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}/${holding.shrsOrPrnAmt.sshPrnamtType}` }
 
       } else {
         // dot.{periodOfReport, value, shares, holdingType}
@@ -367,7 +368,7 @@ function processFormDataWithDatabase(companyFilingArr) {
           holding.dot[periodOfReportArray[i]] = { periodOfReport: false, value: 0, shares: 0, holdingType: "" }
         }
         const por = holding.dot[periodOfReportArray[i]]
-        sumValue[periodOfReportArray[i]] += por["value"]
+        sumValue[periodOfReportArray[i]] += Number(por["value"])
 
         // Values
         csvString += `${por["value"]},`
@@ -491,16 +492,25 @@ async function main() {
       // console.log(`Created folder)
     }
   })
+  // Comment out these lines when using a json file as test data + the loops closing bracket
+  // [
   // Loop through CIK numbers & request/process data for each
   for (let i = 0; i < cikArray.length; i++) {
+    const queryStr = cikArray[i]
     process.stdout.write("\r\x1b[K")
     process.stdout.write(`Processing 13F-HR filings...query ${i + 1}/${cikArray.length}`)
-    const queryStr = cikArray[i]
     // Grab full filings object
     const secData = await getForm13FHR(queryStr)
-    // Test Data
+    // ]
+
+    // Uncomment these lines to use a json file for test data
+    // [
+    // // Test Data
     // let i = 1
-    // const secData = JSON.parse(fs.readFileSync("./testData.json"))
+    // // const secData = JSON.parse(fs.readFileSync("./testData.json"))
+    // const secData = JSON.parse(fs.readFileSync("./rawData_for_13F-HR_2025-03-31_to_2026-02-20_timestamp_2026-02-20.json"))
+    // ]
+
     let filings = secData.filings
     const filingsByCompany = {}
 
@@ -511,11 +521,13 @@ async function main() {
       }
       filingsByCompany[filing.cik].push(filing)
     }
-
+    let companyCounter = 1
     // Process data for each array of company filings
     for (const key in filingsByCompany) {
       const companyFilingArr = filingsByCompany[key]
-
+      process.stdout.write("\r\x1b[K")
+      process.stdout.write(`Processing 13F-HR filings...company ${companyCounter}/${Object.keys(filingsByCompany).length}`)
+      companyCounter++
       const { secFormFilepath, queriedDataFilepath } = await createFoldersAndFilePaths(companyFilingArr[0])
 
 
@@ -577,6 +589,33 @@ async function main() {
   }
 
   fs.rmSync(fullFilepath, { recursive: true, force: true });
+
+  // Create list of CIK numbers that turned up no results
+  let noResultCSV = ""
+  for (const cik of process.argv.slice(2)) {
+    let tracker = false
+    let trimmedCik = cik.toString().replace(/^0+/, '')
+
+    for (filing of fullJSONFilings.filings) {
+      if (filing.cik.toString() === trimmedCik) {
+        tracker = true
+      }
+    }
+
+    if (!tracker) {
+      console.log(`Company ${cik} has no matching filing in the filings list! (${tracker})`)
+      noResultCSV += `${cik}\n`
+    }
+  }
+
+  fs.writeFileSync(path.join(os.homedir(), "Desktop", "sec_csv", `no_filings_list_timestamp_${endDate}.csv`), noResultCSV, err => {
+    if (err) {
+      console.error(err);
+    } else {
+      // file written successfully
+    }
+  });
+
   fs.writeFileSync(path.join(os.homedir(), "Desktop", "sec_csv", `rawData_for_13F-HR_${periodOfReportTracker.earliest.toISOString().split("T")[0]}_to_${periodOfReportTracker.latest.toISOString().split("T")[0]}_timestamp_${endDate}.json`), JSON.stringify(fullJSONFilings), err => {
     if (err) {
       console.error(err);
