@@ -9,6 +9,7 @@ Some scripts to assist with gathering and organizing SEC filing data.
 * [Installation and Usage](#installation-and-usage)
     * [Script: sql-command-generator](#script-sql-command-generator)
     * [Script: sec-to-csv](#script-sec-to-csv)
+        * [Script: Node_Modules](#node_modules)
     * [Script: form13F.js](#script-form13F.js)
 * [Contributing](#contributing)    
 
@@ -65,6 +66,42 @@ Because this script uses a free, but limited service, it can only make a limited
 You will need an API key from [the website providing this API service](https://sec-api.io/pricing). It should be placed in a file named `.env` in the same folder as this `.js` script, as so:
 ```
 API_KEY = "Paste Key Here"
+```
+
+#### Node_Modules
+
+This script also grabs data from the 13F cover pages. Unfortunately, I could not figure out how to get the `sec-api` library to request this data, and had to make some personal edits. These edits are not contained in this repository, and must be inserted in manually after completing the above steps. 
+
+In the folder this script is contained in, you will find a file called `node_modules/sec-api/index.js`. In this file you will find the following section of code:
+```
+const getFilingsQuery = async (query) => {
+  const options = {
+    method: 'post',
+    url: config.queryApi.endpoint,
+    headers: { Authorization: store.apiKey },
+    data: query,
+  };
+
+  const { data } = await axios(options);
+
+  return data;
+};
+```
+
+Replace the above lines of code with the following and save the file:
+```
+const getFilingsQuery = async (query, urlStuff="") => {
+  const options = {
+    method: 'post',
+    url: `${config.queryApi.endpoint}${urlStuff}`,
+    headers: { Authorization: store.apiKey },
+    data: query,
+  };
+
+  const { data } = await axios(options);
+
+  return data;
+};
 ```
 
 ## Contributing
