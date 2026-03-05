@@ -36,7 +36,7 @@ const periodOfReportTracker = {
   earliest: new Date(),
   latest: new Date()
 }
-// cikArray = ["0000928047"]
+// cikArray = ["(formType:13F AND NOT formType:NT AND periodOfReport:[2025-02-23 TO 2026-02-23]) AND (cik:(944388, 1463559, 899051, 9622, 9631, 1335382, 1335382, 1977794, 1228242, 898286, 1143309, 1283718, 1991835, 2055639, 1045520, 1021926, 1277690, 1421224, 1056527, 831001))"]
 const cikArray = processArgs()
 
 // =======================================FUNCTIONS=======================================
@@ -53,7 +53,7 @@ function processArgs() {
     tempCikStr += cik
 
     if ((i % 10 === 0 && i !== 0) || i === tempCikArray.length) {
-      cikArray.push(`(formType:13F AND NOT formType:NT AND NOT formType:A AND periodOfReport:[${startDate} TO ${endDate}]) AND (cik:(${tempCikStr}))`)
+      cikArray.push(`(formType:13F AND NOT formType:NT AND periodOfReport:[${startDate} TO ${endDate}]) AND (cik:(${tempCikStr}))`)
       tempCikStr = ""
     } else {
       tempCikStr += ", "
@@ -145,15 +145,29 @@ function getDatabaseObj(databaseMatrix) {
 }
 
 // Makes api request; returns json result
-async function getForm13FHR(queryStr) {
+async function getForm13FHR(queryStr, initialSkip = 0) {
   let query = {
     query: `${queryStr}`,
-    from: '0', // start with first filing. used for pagination/skipping entries
+    from: `${initialSkip}`, // start with first filing. used for pagination/skipping entries
     size: '50', // limit response to # of filings, max 50
     sort: [{ periodOfReport: { order: 'desc' } }], // sort result by filedAt, newest first
   }
 
-  return await queryApi.getFilings(query);
+  return await queryApi.getFilings(query)
+}
+
+// Makes additional queries to grab results beyond additional 50, returns [...filings]
+async function checkAndGrabAdditionalResults(secData, queryStr) {
+  // Query only returns first 50 filings—if there are more, additional queries need to be made per 50 filings
+  if (Number(secData.total.value) > 50) {
+    let i = 50
+    while (i < Number(secData.total.value)) {
+      let additionalResults = await getForm13FHR(queryStr, i)
+      secData.filings = secData.filings.concat(additionalResults.filings)
+      i += 50
+    }
+  }
+  return secData
 }
 
 // Takes in form 13F-HR in object form and returns an object with a filename and csvString entries
@@ -215,6 +229,34 @@ function form13FHRtoCSV(formObj) {
   }
 
   return { filename: filename, csv: csvString }
+}
+
+// Ensures only the most recent filing is used for a given period of report; returns array
+function replaceFilingsWithAmendments(companyFilingArr) {
+  const filteredArray = []
+
+  for (let filing of companyFilingArr) {
+    // If filtered array empty or already has an entry for the period of report of the current filing we move on to ensure only one entry in array per period of report
+    if (!!filteredArray[filteredArray.length - 1] && filing.periodOfReport === filteredArray[filteredArray.length - 1].periodOfReport) {
+      continue
+    }
+
+    let temp = filing
+    for (let i = 0; i < companyFilingArr.length; i++) {
+      let tempFilingDate = new Date(temp.effectivenessDate).getTime()
+      let currentFilingDate = new Date(companyFilingArr[i].effectivenessDate).getTime()
+      // Bigger number = more recent
+      if (companyFilingArr[i].periodOfReport === filing.periodOfReport && tempFilingDate < currentFilingDate) {
+        temp = companyFilingArr[i]
+      }
+    }
+    filteredArray.push(temp)
+  }
+
+
+  // Sorting this most recent to oldest even though it's probably already sorted because "probably"
+  const sortedFilteredArray = filteredArray.sort((x, y) => new Date(y.date) - new Date(x.date))
+  return sortedFilteredArray
 }
 
 // Compiles together all filings in given array (assumed to be a single company), matches CUSIP numbers from mainDatabase Object, builds table, returns in format {filename: "filename", csv: "csvString"}
@@ -481,7 +523,6 @@ function getQuarter(date) {
   return Math.floor(d.getMonth() / 3 + 1);
 }
 
-
 // =======================================MAIN=======================================
 // Loops through companies, creating folders, running data processing functions, and recording data to .csv files
 async function main() {
@@ -500,7 +541,16 @@ async function main() {
     process.stdout.write("\r\x1b[K")
     process.stdout.write(`Processing 13F-HR filings...query ${i + 1}/${cikArray.length}`)
     // Grab full filings object
-    const secData = await getForm13FHR(queryStr)
+
+    let results = await getForm13FHR(queryStr)
+    const secData = await checkAndGrabAdditionalResults(results, queryStr)
+    fs.writeFileSync(`./amendment_test_data.json`, JSON.stringify(secData), err => {
+      if (err) {
+        console.error(err);
+      } else {
+        // file written successfully
+      }
+    });
     // ]
 
     // Uncomment these lines to use a json file for test data
@@ -508,7 +558,8 @@ async function main() {
     // // Test Data
     // let i = 1
     // // const secData = JSON.parse(fs.readFileSync("./testData.json"))
-    // const secData = JSON.parse(fs.readFileSync("./rawData_for_13F-HR_2025-03-31_to_2026-02-20_timestamp_2026-02-20.json"))
+    // // const secData = JSON.parse(fs.readFileSync("./rawData_for_13F-HR_2025-03-31_to_2026-02-20_timestamp_2026-02-20.json"))
+    // const secData = JSON.parse(fs.readFileSync("./amendment_test_data.json"))
     // ]
 
     let filings = secData.filings
@@ -521,12 +572,13 @@ async function main() {
       }
       filingsByCompany[filing.cik].push(filing)
     }
+
     let companyCounter = 1
     // Process data for each array of company filings
     for (const key in filingsByCompany) {
       const companyFilingArr = filingsByCompany[key]
-      process.stdout.write("\r\x1b[K")
-      process.stdout.write(`Processing 13F-HR filings...company ${companyCounter}/${Object.keys(filingsByCompany).length}`)
+      // process.stdout.write("\r\x1b[K")
+      // process.stdout.write(`Processing 13F-HR filings...company ${companyCounter}/${Object.keys(filingsByCompany).length}`)
       companyCounter++
       const { secFormFilepath, queriedDataFilepath } = await createFoldersAndFilePaths(companyFilingArr[0])
 
@@ -544,8 +596,9 @@ async function main() {
         });
       }
 
+      const filteredCompanyFilingArr = replaceFilingsWithAmendments(companyFilingArr)
       // Returns in format {filename: "filename", csv: "csvString"}
-      const queriedData = processFormDataWithDatabase(companyFilingArr)
+      const queriedData = processFormDataWithDatabase(filteredCompanyFilingArr)
       // Only writes file if data exists
       if (queriedData.csv) {
         fs.writeFile(path.join(queriedDataFilepath, queriedData.filename), queriedData.csv, err => {
