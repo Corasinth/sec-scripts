@@ -1,5 +1,5 @@
 // =======================================DATAFLOW EXPLANATION=======================================
-// When running the script, it is nessecary to add space seperated CIK numbers for the companies you're interested in. The script takes these numbers, trims the leading 0s, splits them into groups of ten, generates a queryStr for the API, and puts them into an array. It does this because the max number of filings that the API returns is 50, and the script is setup to search for 13F-HR files (excluding amendments and 13F-NT files) in the last year, specifically filings with a period of report between when the script was run and exactly 1 year ago. With a filing each quarter, 10 companies produces 40 filings—and the extra ten are just in case we get up to 5 filings/company, for some reason. It may be that the script only produces three filings for the last year as well, due to mismatches in the period of report, but if so this can be fixed by editing how the startDate value is calculated, and by editing the number of CIK numbers grouped together to not exceed the total 50.
+// When running the script, it is nessecary to add space seperated CIK numbers for the companies you're interested in. The script takes these numbers, trims the leading 0s, splits them into groups of ten, generates a queryStr for the API, and puts them into an array. It does this because the max number of filings that the API returns is 50, and the script is setup to search for 13F-HR files (excluding 13F-NT files) in the last year, specifically filings with a period of report between when the script was run and exactly 1 year ago. With a filing each quarter, 10 companies produces 40 filings—and the extra ten are just in case we get up to 5 filings/company, for some reason. It may be that the script only produces three filings for the last year as well, due to mismatches in the period of report, but if so this can be fixed by editing how the startDate value is calculated, and by editing the number of CIK numbers grouped together to not exceed the total 50.
 
 // The script will take the filing info from these companies and compare them against the ./database.csv file assumed to be in this folder. To turn the csv file into something more useful for data comparisons, each row in the file is converted into a an object entry in a larger object, with the key name being the second column of the database.csv file, assumed to be CUSIP. Additionally, the headers of the columns, assumed to be the first row, are saved as a seperate array and used to both set the keys for the row data and retrieve them later in the correct order. 
 
@@ -36,6 +36,8 @@ const periodOfReportTracker = {
   earliest: new Date(),
   latest: new Date()
 }
+// Counter to track how many api calls are made
+let apiCallCounter = 0
 // cikArray = ["(formType:13F AND NOT formType:NT AND periodOfReport:[2025-02-23 TO 2026-02-23]) AND (cik:(944388, 1463559, 899051, 9622, 9631, 1335382, 1335382, 1977794, 1228242, 898286, 1143309, 1283718, 1991835, 2055639, 1045520, 1021926, 1277690, 1421224, 1056527, 831001))"]
 const cikArray = processArgs()
 
@@ -56,7 +58,7 @@ function processArgs() {
       cikArray.push(`(formType:13F AND NOT formType:NT AND periodOfReport:[${startDate} TO ${endDate}]) AND (cik:(${tempCikStr}))`)
       tempCikStr = ""
     } else {
-      tempCikStr += ", "
+      tempCikStr += " OR "
     }
   }
 
@@ -152,8 +154,41 @@ async function getForm13FHR(queryStr, initialSkip = 0) {
     size: '50', // limit response to # of filings, max 50
     sort: [{ periodOfReport: { order: 'desc' } }], // sort result by filedAt, newest first
   }
+  let secData = await queryApi.getFilings(query)
+  apiCallCounter++
+  // Returns {total:object,data:arrayOfCoverPages}
+  let coverPagesData = await queryApi.getFilings(query, "/form-13f/cover-pages")
+  apiCallCounter++
 
-  return await queryApi.getFilings(query)
+  return assignCoverPageToFiling(secData, coverPagesData)
+}
+
+// Uses accessionNo to attatch coverPage data to each filing.
+function assignCoverPageToFiling(secData, coverPageData) {
+
+  for (let i = 0; i < secData.filings.length; i++) {
+    let checkIfFoundCoverPage = 0
+    let filing = secData.filings[i]
+
+    for (let coverPage of coverPageData.data) {
+      if (filing.accessionNo === coverPage.accessionNo) {
+        secData.filings[i].coverPage = coverPage
+        checkIfFoundCoverPage++
+        if (filing.periodOfReport !== coverPage.periodOfReport) {
+          console.log(`\nPeriodOfReport does not match up for:\nAccession: ${filing.accessionNo}\nCompany: ${filing.companyName}\nCIK: ${filing.cik}\nPeriodOfReport: ${filing.periodOfReport}`)
+        }
+        if (checkIfFoundCoverPage > 1) {
+          // Accession number should be unique, if it isn't something weird is happening.
+          console.log(`\nFound multiple matches for:\nAccession: ${filing.accessionNo}\nCompany: ${filing.companyName}\nCIK: ${filing.cik}\nPeriodOfReport: ${filing.periodOfReport}`)
+        }
+      }
+    }
+    if (!checkIfFoundCoverPage) {
+      // Identical queries should return identical results—a cover page for every filing. If there isn't a match, something weird is happening.
+      console.log(`\nFound no matching cover page for:\nAccession: ${filing.accessionNo}\nCompany: ${filing.companyName}\nCIK: ${filing.cik}\nPeriodOfReport: ${filing.periodOfReport}`)
+    }
+  }
+  return secData
 }
 
 // Makes additional queries to grab results beyond additional 50, returns [...filings]
@@ -302,7 +337,14 @@ function processFormDataWithDatabase(companyFilingArr) {
       if (companyFilingObject[holding.cusip].dot[currentPeriodOfReport]) {
         // If entry for current period of report already exists, there's some funky reporting. This records the multiple entries under the same CUSIP number
         // companyFilingObject[holding.cusip].dot[currentPeriodOfReport] = { periodOfReport: currentPeriodOfReport, value: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].value}/${holding.value}`, shares: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].shares}/${holding.shrsOrPrnAmt.sshPrnamt}`, holdingType: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}/${holding.shrsOrPrnAmt.sshPrnamtType}` }
-        companyFilingObject[holding.cusip].dot[currentPeriodOfReport] = { periodOfReport: currentPeriodOfReport, value: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].value) + Number(holding.value)}`, shares: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].shares) + Number(holding.shrsOrPrnAmt.sshPrnamt)}`, holdingType: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}/${holding.shrsOrPrnAmt.sshPrnamtType}` }
+        if (companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType !== holding.shrsOrPrnAmt.sshPrnamtType) {
+          console.log(`\nThere is a shares/PRN mismatch for ${companyFilingObject[holding.cusip].companyName}.\nCIK#:${companyFilingObject[holding.cusip].cik}\nPeriodOfReport:${currentPeriodOfReport}\nPreviously:${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}\nNow:${holding.shrsOrPrnAmt.sshPrnamtType}`)
+
+          companyFilingObject[holding.cusip].dot[currentPeriodOfReport] = { periodOfReport: currentPeriodOfReport, value: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].value) + Number(holding.value)}`, shares: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].shares) + Number(holding.shrsOrPrnAmt.sshPrnamt)}`, holdingType: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}/${holding.shrsOrPrnAmt.sshPrnamtType}` }
+        } else {
+          companyFilingObject[holding.cusip].dot[currentPeriodOfReport] = { periodOfReport: currentPeriodOfReport, value: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].value) + Number(holding.value)}`, shares: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].shares) + Number(holding.shrsOrPrnAmt.sshPrnamt)}`, holdingType: `${holding.shrsOrPrnAmt.sshPrnamtType}` }
+        }
+
 
       } else {
         // dot.{periodOfReport, value, shares, holdingType}
@@ -479,6 +521,96 @@ function processFormDataWithDatabase(companyFilingArr) {
   return { filename: filename, csv: csvString }
 }
 
+function collectCoverPageDataIntoCSVTables(companyFilingArr) {
+  // Set filename
+  const filename = `${companyFilingArr[companyFilingArr.length - 1].periodOfReport}_to_${companyFilingArr[0].periodOfReport}_cover_page_data_${replaceSpaceWithDashAndRemoveSpecialCharacters(companyFilingArr[0].companyName)}_${companyFilingArr[0].cik}.csv`
+
+  let coverPageCSVString = ""
+
+  // Label Table
+  coverPageCSVString += "TOTAL_VALUE\n"
+  // Build Headers
+  coverPageCSVString += "QUARTER,TABLE_VALUE_TOTAL,TABLE_VALUE_TOTAL_AS_REPORTED\n"
+
+  for (let i = companyFilingArr.length - 1; i >= 0; i--) {
+    const coverPage = companyFilingArr[i].coverPage
+    coverPageCSVString += `Q${getQuarter(coverPage.periodOfReport)},${coverPage.tableValueTotal},${coverPage.tableValueTotalAsReported}\n`
+  }
+
+  for (let i = companyFilingArr.length - 1; i > -1; i--) {
+    const coverPage = companyFilingArr[i].coverPage
+    // Skip if array is empty
+    if (!coverPage.otherManagersReportingForThisManager[0]) {
+      continue
+    }
+    let table = arrayOfIdenticalObjectsIntoCSVTable(coverPage.otherManagersReportingForThisManager)
+
+    // Use headers only for the first array 
+    if (i === companyFilingArr.length - 1) {
+      // Label Table
+      coverPageCSVString += "\nOTHER_MANAGERS_REPORTING_FOR_THIS_MANAGER"
+      coverPageCSVString += `\nQUARTER,${table[0].join().toUpperCase()}\n`
+    }
+    table = table.slice(1)
+
+    for (let row of table) {
+      coverPageCSVString += `Q${getQuarter(companyFilingArr[i].periodOfReport)},${row.join()}\n`
+    }
+  }
+
+  for (let i = companyFilingArr.length - 1; i > -1; i--) {
+    const coverPage = companyFilingArr[i].coverPage
+    // Skip if array is empty
+    if (!coverPage.otherIncludedManagers[0]) {
+      continue
+    }
+
+    let table = arrayOfIdenticalObjectsIntoCSVTable(coverPage.otherIncludedManagers)
+
+    // Use headers only for the first array 
+    if (i === companyFilingArr.length - 1) {
+      // Label Table
+      coverPageCSVString += "\nOTHER_INCLUDED_MANAGERS"
+      coverPageCSVString += `\nQUARTER,${table[0].join().replace(/\s+/g, '_').toUpperCase()}\n`
+    }
+    table = table.slice(1)
+
+    for (let row of table) {
+      coverPageCSVString += `Q${getQuarter(companyFilingArr[i].periodOfReport)},${row.join()}\n`
+    }
+  }
+
+  return { filename: filename, csv: coverPageCSVString }
+}
+
+// Returns matrix where first entry is Object.keys() array
+function arrayOfIdenticalObjectsIntoCSVTable(objectArray) {
+  let matrix = []
+  let keysArray = Object.keys(objectArray[0])
+  matrix.push(keysArray)
+
+  for (let obj of objectArray) {
+    let tempArray = []
+    for (key of keysArray) {
+      tempArray.push(obj[key])
+    }
+    matrix.push(tempArray)
+  }
+  return sanitizeMatrix(matrix)
+}
+
+// Removes quotes and new line characters from matrix of values + puts string in quotes to make compatible with CSV string
+function sanitizeMatrix(matrix) {
+  for (let i = 0; i < matrix.length; i++) {
+    for (let j = 0; j < matrix[i].length; j++) {
+      if (matrix[i][j]) {
+        matrix[i][j] = `"${matrix[i][j].toString().replace(/["'“”‘’\n\r\t]/g, "")}"`
+      }
+    }
+  }
+  return matrix
+}
+
 async function createFoldersAndFilePaths(form) {
   // Creates file paths
   const secFormFilepath = path.join(os.homedir(), 'Desktop', "sec_csv", "Form13F-HR", `${replaceSpaceWithDashAndRemoveSpecialCharacters(form.companyName)}_CIK_${form.cik}_${replaceSpaceWithDashAndRemoveSpecialCharacters(form.formType)}.csv`);
@@ -544,7 +676,7 @@ async function main() {
 
     let results = await getForm13FHR(queryStr)
     const secData = await checkAndGrabAdditionalResults(results, queryStr)
-    fs.writeFileSync(`./amendment_test_data.json`, JSON.stringify(secData), err => {
+    fs.writeFileSync(`./cover_page_test_data.json`, JSON.stringify(secData), err => {
       if (err) {
         console.error(err);
       } else {
@@ -558,8 +690,7 @@ async function main() {
     // // Test Data
     // let i = 1
     // // const secData = JSON.parse(fs.readFileSync("./testData.json"))
-    // // const secData = JSON.parse(fs.readFileSync("./rawData_for_13F-HR_2025-03-31_to_2026-02-20_timestamp_2026-02-20.json"))
-    // const secData = JSON.parse(fs.readFileSync("./amendment_test_data.json"))
+    // const secData = JSON.parse(fs.readFileSync("./cover_page_test_data.json"))
     // ]
 
     let filings = secData.filings
@@ -599,9 +730,19 @@ async function main() {
       const filteredCompanyFilingArr = replaceFilingsWithAmendments(companyFilingArr)
       // Returns in format {filename: "filename", csv: "csvString"}
       const queriedData = processFormDataWithDatabase(filteredCompanyFilingArr)
+      const coverPageData = collectCoverPageDataIntoCSVTables(companyFilingArr)
+
       // Only writes file if data exists
       if (queriedData.csv) {
         fs.writeFile(path.join(queriedDataFilepath, queriedData.filename), queriedData.csv, err => {
+          if (err) {
+            console.error(err);
+          } else {
+            // file written successfully
+          }
+        });
+
+        fs.writeFile(path.join(queriedDataFilepath, coverPageData.filename), coverPageData.csv, err => {
           if (err) {
             console.error(err);
           } else {
@@ -656,7 +797,7 @@ async function main() {
     }
 
     if (!tracker) {
-      console.log(`Company ${cik} has no matching filing in the filings list! (${tracker})`)
+      console.log(`\nCompany ${cik} has no matching filing in the filings list! (${tracker})`)
       noResultCSV += `${cik}\n`
     }
   }
@@ -678,6 +819,7 @@ async function main() {
   });
   process.stdout.write("\r\x1b[K")
   console.log("Processing 13F-HR filings...Finished")
+  console.log(`Made ${apiCallCounter} API Calls.`)
 }
 
 main()
