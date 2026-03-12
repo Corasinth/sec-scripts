@@ -40,6 +40,8 @@ const periodOfReportTracker = {
 let apiCallCounter = 0
 // cikArray = ["(formType:13F AND NOT formType:NT AND periodOfReport:[2025-02-23 TO 2026-02-23]) AND (cik:(944388, 1463559, 899051, 9622, 9631, 1335382, 1335382, 1977794, 1228242, 898286, 1143309, 1283718, 1991835, 2055639, 1045520, 1021926, 1277690, 1421224, 1056527, 831001))"]
 const cikArray = processArgs()
+const testDataFile = ""
+// const testDataFile = "rawData_for_13F-HR_2025-03-31_to_2026-03-09_timestamp_2026-03-09.json"
 
 // =======================================FUNCTIONS=======================================
 // Takes in arguments, throws an error if there aren't any, and generates query strings used for API calls
@@ -63,8 +65,11 @@ function processArgs() {
   }
 
   if (cikArray.length === 0) {
-    console.error("\nPlease add as space-seperated arguments the CIK numbers of the companies you are interested\n\nAs follows: node form13F.js ########## ########## ##########\nThe script will now exit.")
-    process.exit()
+    console.error("\nPlease add as space-seperated arguments the CIK numbers of the companies you are interested\n\nAs follows: node form13F.js ########## ########## ##########.")
+    if(!testDataFile){
+      console.error("The script will now exit.")
+      process.exit()
+    }
   }
 
   return cikArray
@@ -300,7 +305,6 @@ function processFormDataWithDatabase(companyFilingArr) {
   // Holds periods of report for filings to later iterate through—newest to oldest
   const periodOfReportArray = []
   const companyFilingObject = {}
-
   // Compare and set periodOfReportTracker
   if (new Date(companyFilingArr[0].periodOfReport).getTime() > periodOfReportTracker.latest.getTime()) {
     periodOfReportTracker.latest = new Date(companyFilingArr[0].periodOfReport)
@@ -674,24 +678,14 @@ async function main() {
     process.stdout.write(`Processing 13F-HR filings...query ${i + 1}/${cikArray.length}`)
     // Grab full filings object
 
-    let results = await getForm13FHR(queryStr)
-    const secData = await checkAndGrabAdditionalResults(results, queryStr)
-    fs.writeFileSync(`./cover_page_test_data.json`, JSON.stringify(secData), err => {
-      if (err) {
-        console.error(err);
-      } else {
-        // file written successfully
-      }
-    });
-    // ]
-
-    // Uncomment these lines to use a json file for test data
-    // [
-    // // Test Data
-    // let i = 1
-    // // const secData = JSON.parse(fs.readFileSync("./testData.json"))
-    // const secData = JSON.parse(fs.readFileSync("./cover_page_test_data.json"))
-    // ]
+    // If testDataFile exists use it as raw data and skip querying entirely
+    let secData
+    if(testDataFile){
+      secData = JSON.parse(fs.readFileSync(testDataFile))
+    } else {
+      let results = await getForm13FHR(queryStr)
+      secData = await checkAndGrabAdditionalResults(results, queryStr)
+    }
 
     let filings = secData.filings
     const filingsByCompany = {}
