@@ -18,12 +18,13 @@ require('dotenv').config({ quiet: true })
 const fs = require("node:fs")
 const path = require('path');
 const os = require('os')
-const { queryApi } = require('sec-api');
+const { form13FHoldingsApi, form13FCoverPagesApi } = require('sec-api');
 
 // =======================================MAIN VARIABLES=======================================
 // Set API Key for sec-api
 const API_KEY = process.env.API_KEY
-queryApi.setApiKey(API_KEY);
+form13FHoldingsApi.setApiKey(API_KEY);
+form13FCoverPagesApi.setApiKey(API_KEY);
 // Path to database file—change if needed
 const databaseCSVPath = "./database.csv"
 // Get headers and turn database .csv file into more easily usable object
@@ -159,10 +160,10 @@ async function getForm13FHR(queryStr, initialSkip = 0) {
     size: '50', // limit response to # of filings, max 50
     sort: [{ periodOfReport: { order: 'desc' } }], // sort result by filedAt, newest first
   }
-  let secData = await queryApi.getFilings(query)
+  let secData = await form13FHoldingsApi.getData(query)
   apiCallCounter++
   // Returns {total:object,data:arrayOfCoverPages}
-  let coverPagesData = await queryApi.getFilings(query, "/form-13f/cover-pages")
+  let coverPagesData = await form13FCoverPagesApi.getData(query)
   apiCallCounter++
 
   return assignCoverPageToFiling(secData, coverPagesData)
