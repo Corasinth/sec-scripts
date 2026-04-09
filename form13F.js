@@ -40,10 +40,10 @@ const periodOfReportTracker = {
 // Counter to track how many api calls are made
 let apiCallCounter = 0
 // cikArray = ["(formType:13F AND NOT formType:NT AND periodOfReport:[2025-02-23 TO 2026-02-23]) AND (cik:(944388, 1463559, 899051, 9622, 9631, 1335382, 1335382, 1977794, 1228242, 898286, 1143309, 1283718, 1991835, 2055639, 1045520, 1021926, 1277690, 1421224, 1056527, 831001))"]
-const cikArray = processArgs()
-const testDataFile = ""
-// const testDataFile = "rawData_for_13F-HR_2025-03-31_to_2026-03-09_timestamp_2026-03-09.json"
+// const testDataFile = ""
+const testDataFile = "rawData_for_13F-HR_2025-03-31_to_2026-03-09_timestamp_2026-03-09.json"
 
+const cikArray = processArgs()
 // =======================================FUNCTIONS=======================================
 // Takes in arguments, throws an error if there aren't any, and generates query strings used for API calls
 function processArgs() {
@@ -66,10 +66,12 @@ function processArgs() {
   }
 
   if (cikArray.length === 0) {
-    console.error("\nPlease add as space-seperated arguments the CIK numbers of the companies you are interested\n\nAs follows: node form13F.js ########## ########## ##########.")
+    console.error("\nPlease add as space-seperated arguments the CIK numbers of the companies you are interested in\n\nAs follows: node form13F.js ########## ########## ##########.")
     if(!testDataFile){
       console.error("The script will now exit.")
       process.exit()
+    } else {
+      cikArray = ["test"]
     }
   }
 
@@ -657,7 +659,7 @@ function titleCase(str) {
 // https://bobbyhadz.com/blog/javascript-get-date-quarter
 function getQuarter(date) {
   let d = new Date(date)
-  return Math.floor(d.getMonth() / 3 + 1);
+  return `${Math.floor(d.getMonth() / 3 + 1)}_${d.getFullYear()}`;
 }
 
 // =======================================MAIN=======================================
