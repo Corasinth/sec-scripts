@@ -40,8 +40,8 @@ const periodOfReportTracker = {
 // Counter to track how many api calls are made
 let apiCallCounter = 0
 // cikArray = ["(formType:13F AND NOT formType:NT AND periodOfReport:[2025-02-23 TO 2026-02-23]) AND (cik:(944388, 1463559, 899051, 9622, 9631, 1335382, 1335382, 1977794, 1228242, 898286, 1143309, 1283718, 1991835, 2055639, 1045520, 1021926, 1277690, 1421224, 1056527, 831001))"]
-// const testDataFile = ""
-const testDataFile = "rawData_for_13F-HR_2025-03-31_to_2026-03-09_timestamp_2026-03-09.json"
+const testDataFile = ""
+// const testDataFile = "rawData_for_13F-HR_2025-03-31_to_2026-03-09_timestamp_2026-03-09.json"
 
 const cikArray = processArgs()
 // =======================================FUNCTIONS=======================================
@@ -67,7 +67,7 @@ function processArgs() {
 
   if (cikArray.length === 0) {
     console.error("\nPlease add as space-seperated arguments the CIK numbers of the companies you are interested in\n\nAs follows: node form13F.js ########## ########## ##########.")
-    if(!testDataFile){
+    if (!testDataFile) {
       console.error("The script will now exit.")
       process.exit()
     } else {
@@ -305,6 +305,10 @@ function replaceFilingsWithAmendments(companyFilingArr) {
 // Compiles together all filings in given array (assumed to be a single company), matches CUSIP numbers from mainDatabase Object, builds table, returns in format {filename: "filename", csv: "csvString"}
 // companyFilingArr will be newest to oldest
 function processFormDataWithDatabase(companyFilingArr) {
+
+  // Makes a table from the coverpage data to add to the end of the csvString
+  let coverPageTableString = collectCoverPageDataIntoCSVTables(companyFilingArr)
+
   // Holds periods of report for filings to later iterate through—newest to oldest
   const periodOfReportArray = []
   const companyFilingObject = {}
@@ -525,6 +529,8 @@ function processFormDataWithDatabase(companyFilingArr) {
   }
   csvString += '\n'
 
+  csvString += coverPageTableString
+
   return { filename: filename, csv: csvString }
 }
 
@@ -587,7 +593,7 @@ function collectCoverPageDataIntoCSVTables(companyFilingArr) {
     }
   }
 
-  return { filename: filename, csv: coverPageCSVString }
+  return coverPageCSVString
 }
 
 // Returns matrix where first entry is Object.keys() array
@@ -672,8 +678,7 @@ async function main() {
       // console.log(`Created folder)
     }
   })
-  // Comment out these lines when using a json file as test data + the loops closing bracket
-  // [
+
   // Loop through CIK numbers & request/process data for each
   for (let i = 0; i < cikArray.length; i++) {
     const queryStr = cikArray[i]
@@ -683,7 +688,7 @@ async function main() {
 
     // If testDataFile exists use it as raw data and skip querying entirely
     let secData
-    if(testDataFile){
+    if (testDataFile) {
       secData = JSON.parse(fs.readFileSync(testDataFile))
     } else {
       let results = await getForm13FHR(queryStr)
@@ -724,22 +729,26 @@ async function main() {
         });
       }
 
-      const filteredCompanyFilingArr = replaceFilingsWithAmendments(companyFilingArr)
-      // Returns in format {filename: "filename", csv: "csvString"}
-      const queriedData = processFormDataWithDatabase(filteredCompanyFilingArr)
-      const coverPageData = collectCoverPageDataIntoCSVTables(companyFilingArr)
-
-      // Only writes file if data exists
-      if (queriedData.csv) {
-        fs.writeFile(path.join(queriedDataFilepath, queriedData.filename), queriedData.csv, err => {
+      if (companyFilingArr[0].cik == '1463559') {
+        fs.writeFileSync('covering_test.json', JSON.stringify(companyFilingArr), err => {
           if (err) {
             console.error(err);
           } else {
             // file written successfully
           }
         });
+        process.exit()
+      }
 
-        fs.writeFile(path.join(queriedDataFilepath, coverPageData.filename), coverPageData.csv, err => {
+
+      const filteredCompanyFilingArr = replaceFilingsWithAmendments(companyFilingArr)
+
+      // Returns in format {filename: "filename", csv: "csvString"}
+      const queriedData = processFormDataWithDatabase(filteredCompanyFilingArr)
+
+      // Only writes file if data exists
+      if (queriedData.csv) {
+        fs.writeFile(path.join(queriedDataFilepath, queriedData.filename), queriedData.csv, err => {
           if (err) {
             console.error(err);
           } else {
