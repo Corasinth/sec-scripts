@@ -503,30 +503,31 @@ function processFormDataWithDatabase(companyFilingArr) {
   }
 
   // Add totals row
-  csvString += `"","","","",`
-  for (let i = periodOfReportArray.length - 1; i > -1; i--) {
-    csvString += `${sumValue[periodOfReportArray[i]]},,`
+  // This commented out section adds a summary table below the main data containing per quarter totals for each of the who profits flags
+  // csvString += `"","","","",`
+  // for (let i = periodOfReportArray.length - 1; i > -1; i--) {
+  //   csvString += `${sumValue[periodOfReportArray[i]]},,`
 
-    if (i !== periodOfReportArray.length - 1) {
-      csvString += ","
-    }
-  }
-  csvString += `\n\n"",TOTALS`
-  for (let i = periodOfReportArray.length - 1; i > - 1; i--) {
-    csvString += `,Q${getQuarter(periodOfReportArray[i])}`
-  }
-  csvString += `\n`
+  //   if (i !== periodOfReportArray.length - 1) {
+  //     csvString += ","
+  //   }
+  // }
+  // csvString += `\n\n"",TOTALS`
+  // for (let i = periodOfReportArray.length - 1; i > - 1; i--) {
+  //   csvString += `,Q${getQuarter(periodOfReportArray[i])}`
+  // }
+  // csvString += `\n`
 
-  for (let i = 9; i < headerArray.length; i++) {
-    csvString += headerArray[i]
-    csvString += ","
-    csvString += sumImpact[headerArray[i]]
+  // for (let i = 9; i < headerArray.length; i++) {
+  //   csvString += headerArray[i]
+  //   csvString += ","
+  //   csvString += sumImpact[headerArray[i]]
 
-    for (let j = periodOfReportArray.length - 1; j > - 1; j--) {
-      csvString += `,${sumImpactValue[headerArray[i]][periodOfReportArray[j]]}`
-    }
-    csvString += `\n`
-  }
+  //   for (let j = periodOfReportArray.length - 1; j > - 1; j--) {
+  //     csvString += `,${sumImpactValue[headerArray[i]][periodOfReportArray[j]]}`
+  //   }
+  //   csvString += `\n`
+  // }
   csvString += '\n'
 
   csvString += coverPageTableString
