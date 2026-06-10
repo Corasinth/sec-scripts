@@ -40,8 +40,8 @@ const periodOfReportTracker = {
 // Counter to track how many api calls are made
 let apiCallCounter = 0
 // cikArray = ["(formType:13F AND NOT formType:NT AND periodOfReport:[2025-02-23 TO 2026-02-23]) AND (cik:(944388, 1463559, 899051, 9622, 9631, 1335382, 1335382, 1977794, 1228242, 898286, 1143309, 1283718, 1991835, 2055639, 1045520, 1021926, 1277690, 1421224, 1056527, 831001))"]
-const testDataFile = ""
-// const testDataFile = "rawData_for_13F-HR_2025-03-31_to_2026-03-09_timestamp_2026-03-09.json"
+// const testDataFile = ""
+const testDataFile = "rawData_for_13F-HR_2025-03-31_to_2026-03-09_timestamp_2026-03-09.json"
 
 const cikArray = processArgs()
 // =======================================FUNCTIONS=======================================
@@ -410,8 +410,8 @@ function processFormDataWithDatabase(companyFilingArr) {
       // Generate headers for the .csv form only if there's a match and only if we haven't already made the headers
       if (!madeHeaders) {
         // csvString += "NAME_OF_ISSUER,CUSIP,CIK,VALUE,SHARES_OR_PRN_AMT,SHARES_OR_PRN_TYPE,"
-        csvString += "NAME_OF_ISSUER,CUSIP,ISIN,COUNTRY,"
-
+        // csvString += "NAME_OF_ISSUER,CUSIP,ISIN,COUNTRY,"
+        csvString += "NAME_OF_ISSUER,COUNTRY,"
         // Go oldest to newest, but periodOfReportArray is newest to oldest
         for (let i = periodOfReportArray.length - 1; i > -1; i--) {
           const por = periodOfReportArray[i]
@@ -444,12 +444,12 @@ function processFormDataWithDatabase(companyFilingArr) {
       csvString += `\"${titleCase(mainDatabaseObject[holding.cusip][headerArray[0]].replace(/["'“”‘’]/g, ""))} (${holding.ticker})\"`
       csvString += ','
 
-      csvString += holding.cusip
-      csvString += ','
+      // csvString += holding.cusip
+      // csvString += ','
 
       // ISIN—assumed to be the fourth column
-      csvString += mainDatabaseObject[holding.cusip][headerArray[3]] ?? ""
-      csvString += ','
+      // csvString += mainDatabaseObject[holding.cusip][headerArray[3]] ?? ""
+      // csvString += ','
 
       // Country—assumed to be the third column
       csvString += mainDatabaseObject[holding.cusip][headerArray[2]] ?? ""
@@ -728,18 +728,6 @@ async function main() {
           }
         });
       }
-
-      if (companyFilingArr[0].cik == '1463559') {
-        fs.writeFileSync('covering_test.json', JSON.stringify(companyFilingArr), err => {
-          if (err) {
-            console.error(err);
-          } else {
-            // file written successfully
-          }
-        });
-        process.exit()
-      }
-
 
       const filteredCompanyFilingArr = replaceFilingsWithAmendments(companyFilingArr)
 
