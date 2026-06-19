@@ -407,6 +407,7 @@ function processFormDataWithDatabase(companyFilingArr) {
   // Data is taken to identify the company, then provide value and share data for multiple periods of reports, then fill in row data from the database.csv file
   for (const holding of companyFilingArr) {
     if (mainDatabaseObject[holding.cusip]) {
+      let quarterDifferenceHeaderString = ""
       // Generate headers for the .csv form only if there's a match and only if we haven't already made the headers
       if (!madeHeaders) {
         // csvString += "NAME_OF_ISSUER,CUSIP,CIK,VALUE,SHARES_OR_PRN_AMT,SHARES_OR_PRN_TYPE,"
@@ -421,9 +422,15 @@ function processFormDataWithDatabase(companyFilingArr) {
           // csvString += `TYPE,`
 
           if (i !== periodOfReportArray.length - 1) {
-            csvString += `Q${getQuarter(periodOfReportArray[i + 1])}_TO_Q${getQuarter(por)}_SHARES_DIFF,`
+            quarterDifferenceHeaderString += `Q${getQuarter(periodOfReportArray[i + 1])}_TO_Q${getQuarter(por)}_SHARES_DIFF,`
           }
         }
+
+        // These are added last so that all the share columns are first, and then come all the difference columns next to each other
+        csvString += quarterDifferenceHeaderString
+
+        // Add a column for the difference in shares between first and last quarter
+        csvString += `Q${getQuarter(periodOfReportArray[periodOfReportArray.length - 1])}_TO_Q${getQuarter(periodOfReportArray[0])}_SHARES_DIFF,`
 
         // Before main header array stuff
         csvString += "SOURCES,"
@@ -454,10 +461,12 @@ function processFormDataWithDatabase(companyFilingArr) {
       // Country—assumed to be the third column
       csvString += mainDatabaseObject[holding.cusip][headerArray[2]] ?? ""
       csvString += ','
-
+      
       // csvString += holding.cik
       // csvString += ','
-
+      
+      // Holds the list of value differences between quarters to tack on to the end 
+      let differenceString = ''
       for (let i = periodOfReportArray.length - 1; i > -1; i--) {
         if (!holding.dot[periodOfReportArray[i]]) {
           holding.dot[periodOfReportArray[i]] = { periodOfReport: false, value: 0, shares: 0, holdingType: "" }
@@ -474,9 +483,14 @@ function processFormDataWithDatabase(companyFilingArr) {
 
         if (i !== periodOfReportArray.length - 1) {
           // Difference
-          csvString += `${Number(por.shares) - Number(holding.dot[periodOfReportArray[i + 1]].shares)},`
+          differenceString += `${Number(por.shares) - Number(holding.dot[periodOfReportArray[i + 1]].shares)},`
         }
       }
+
+      // Newest quarter shares - Oldest quarter shares
+      differenceString += `${Number(holding.dot[periodOfReportArray[0]].shares) - Number(holding.dot[periodOfReportArray[periodOfReportArray.length - 1]].shares)},`
+
+      csvString += differenceString
 
       csvString += `\"${mainDatabaseObject[holding.cusip]["sources"]}\",`
 
@@ -666,7 +680,7 @@ function titleCase(str) {
 // https://bobbyhadz.com/blog/javascript-get-date-quarter
 function getQuarter(date) {
   let d = new Date(date)
-  return `${Math.floor(d.getMonth() / 3 + 1)}_${d.getFullYear()}`;
+  return `${Math.floor(d.getMonth() / 3 + 1)}-${d.getFullYear()}`;
 }
 
 // =======================================MAIN=======================================
