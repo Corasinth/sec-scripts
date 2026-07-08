@@ -27,7 +27,9 @@ const testFile = "./canadian_test_file.json"
 // Uses current date to return query string to search the last 4 quarters
 function queryStringGenerator() {
 
-    return `formType:13F AND NOT formType:NT AND NOT formType:A AND periodOfReport:[${startDate} TO ${endDate}] AND (filingManager.address.stateOrCountry:(A0 OR A1 OR A2 OR A3 OR A4 OR A5 OR A6 OR A7 OR A8 OR A9 OR B0 OR Z4))`
+    // return `formType:13F AND NOT formType:NT AND NOT formType:A AND periodOfReport:[${startDate} TO ${endDate}] AND (filingManager.address.stateOrCountry:(A0 OR A1 OR A2 OR A3 OR A4 OR A5 OR A6 OR A7 OR A8 OR A9 OR B0 OR Z4))`
+
+    return `formType:13F AND NOT formType:NT AND periodOfReport:[${startDate} TO ${endDate}] AND (filingManager.address.stateOrCountry:(A0 OR A1 OR A2 OR A3 OR A4 OR A5 OR A6 OR A7 OR A8 OR A9 OR B0 OR Z4))`
 }
 
 // Sends a query for cover pages. 'from' skips the first x results, results are ordered by oldest to newest file date, returns {data, loopContinue}
