@@ -41,7 +41,7 @@ const periodOfReportTracker = {
 let apiCallCounter = 0
 // cikArray = ["(formType:13F AND NOT formType:NT AND periodOfReport:[2025-02-23 TO 2026-02-23]) AND (cik:(944388, 1463559, 899051, 9622, 9631, 1335382, 1335382, 1977794, 1228242, 898286, 1143309, 1283718, 1991835, 2055639, 1045520, 1021926, 1277690, 1421224, 1056527, 831001))"]
 // const testDataFile = ""
-const testDataFile = "rawData_for_13F-HR_2025-03-31_to_2026-03-09_timestamp_2026-03-09.json"
+const testDataFile = "rawData_for_13F-HR_2025-09-30_to_2026-08-16_timestamp_2026-08-16.json"
 
 const cikArray = processArgs()
 // =======================================FUNCTIONS=======================================
@@ -174,13 +174,13 @@ async function getForm13FHR(queryStr, initialSkip = 0) {
 // Uses accessionNo to attatch coverPage data to each filing.
 function assignCoverPageToFiling(secData, coverPageData) {
 
-  for (let i = 0; i < secData.filings.length; i++) {
+  for (let i = 0; i < secData.data.length; i++) {
     let checkIfFoundCoverPage = 0
-    let filing = secData.filings[i]
+    let filing = secData.data[i]
 
     for (let coverPage of coverPageData.data) {
       if (filing.accessionNo === coverPage.accessionNo) {
-        secData.filings[i].coverPage = coverPage
+        secData.data[i].coverPage = coverPage
         checkIfFoundCoverPage++
         if (filing.periodOfReport !== coverPage.periodOfReport) {
           console.log(`\nPeriodOfReport does not match up for:\nAccession: ${filing.accessionNo}\nCompany: ${filing.companyName}\nCIK: ${filing.cik}\nPeriodOfReport: ${filing.periodOfReport}`)
@@ -206,7 +206,7 @@ async function checkAndGrabAdditionalResults(secData, queryStr) {
     let i = 50
     while (i < Number(secData.total.value)) {
       let additionalResults = await getForm13FHR(queryStr, i)
-      secData.filings = secData.filings.concat(additionalResults.filings)
+      secData.data = secData.data.concat(additionalResults.data)
       i += 50
     }
   }
@@ -349,9 +349,18 @@ function processFormDataWithDatabase(companyFilingArr) {
         // If entry for current period of report already exists, there's some funky reporting. This records the multiple entries under the same CUSIP number
         // companyFilingObject[holding.cusip].dot[currentPeriodOfReport] = { periodOfReport: currentPeriodOfReport, value: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].value}/${holding.value}`, shares: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].shares}/${holding.shrsOrPrnAmt.sshPrnamt}`, holdingType: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}/${holding.shrsOrPrnAmt.sshPrnamtType}` }
         if (companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType !== holding.shrsOrPrnAmt.sshPrnamtType) {
-          console.log(`\nThere is a shares/PRN mismatch for ${companyFilingObject[holding.cusip].companyName}.\nCIK#:${companyFilingObject[holding.cusip].cik}\nPeriodOfReport:${currentPeriodOfReport}\nPreviously:${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}\nNow:${holding.shrsOrPrnAmt.sshPrnamtType}`)
+          console.log(`\nThere is a shares/PRN mismatch for ${companyFilingArr[i].companyName}.\nCIK#:${companyFilingObject[holding.cusip].cik}\nPeriodOfReport:${currentPeriodOfReport}\nPreviously:${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}\nNow:${holding.shrsOrPrnAmt.sshPrnamtType}`)
 
-          companyFilingObject[holding.cusip].dot[currentPeriodOfReport] = { periodOfReport: currentPeriodOfReport, value: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].value) + Number(holding.value)}`, shares: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].shares) + Number(holding.shrsOrPrnAmt.sshPrnamt)}`, holdingType: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}/${holding.shrsOrPrnAmt.sshPrnamtType}` }
+          fs.appendFile(path.join(os.homedir(), 'Desktop', "sec_csv", `shares_or_PRN_log_${Math.floor((Date.now()/1000)/30)}.txt`), `There is a shares/PRN mismatch for ${companyFilingArr[i].companyName}.\nCIK#:${companyFilingObject[holding.cusip].cik}\nPeriodOfReport:${currentPeriodOfReport}\nPreviously:${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}\nNow:${holding.shrsOrPrnAmt.sshPrnamtType}\n\n`, (err) => {
+            if (err) {
+              console.log(err)
+            } else {
+              // console.log("File appended")
+            }
+          })
+
+          companyFilingObject[holding.cusip].dot[currentPeriodOfReport] = { periodOfReport: currentPeriodOfReport, value: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].value) + Number(holding.value)}`, shares: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].shares) + Number(holding.shrsOrPrnAmt.sshPrnamt)}`, holdingType: `${holding.shrsOrPrnAmt.sshPrnamtType}` }
+          // ${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}/
         } else {
           companyFilingObject[holding.cusip].dot[currentPeriodOfReport] = { periodOfReport: currentPeriodOfReport, value: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].value) + Number(holding.value)}`, shares: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].shares) + Number(holding.shrsOrPrnAmt.sshPrnamt)}`, holdingType: `${holding.shrsOrPrnAmt.sshPrnamtType}` }
         }
@@ -364,8 +373,30 @@ function processFormDataWithDatabase(companyFilingArr) {
 
 
     }
-    // Saving memory?
-    companyFilingArr[i] = ""
+  }
+  // Quick check at the end to see if the SHARES/PRN value is the same across all periods of report
+  for (let companyCUSIP in companyFilingObject) {
+    let holding = companyFilingObject[companyCUSIP]
+    let holdingDataOverTime = holding.dot
+    
+
+    let holdingTypeSet = new Set()
+
+    for (let periodOfReport in holdingDataOverTime) {
+      holdingTypeSet.add(holdingDataOverTime[periodOfReport]["holdingType"])
+    }
+
+    if (holdingTypeSet.size > 1) {
+      let errorMessage = `The holding type for a company has changed from one period of report to the next.\nCompany Name:${companyFilingArr[0].companyName}\nCompany Invested In:${holding.nameOfIssuer}\nCompany Invested in CIK:${holding.cik}\n\n`
+
+      fs.appendFile(path.join(os.homedir(), 'Desktop', "sec_csv", `shares_or_PRN_overTime_log_${Math.floor((Date.now()/1000)/30)}}.txt`), errorMessage, (err) => {
+        if (err) {
+          console.log(err)
+        } else {
+          // console.log("file appended")
+        }
+      })
+    }
   }
 
   // Sort! Objects into array alphanumerically by company name
@@ -461,10 +492,10 @@ function processFormDataWithDatabase(companyFilingArr) {
       // Country—assumed to be the third column
       csvString += mainDatabaseObject[holding.cusip][headerArray[2]] ?? ""
       csvString += ','
-      
+
       // csvString += holding.cik
       // csvString += ','
-      
+
       // Holds the list of value differences between quarters to tack on to the end 
       let differenceString = ''
       for (let i = periodOfReportArray.length - 1; i > -1; i--) {
@@ -710,7 +741,7 @@ async function main() {
       secData = await checkAndGrabAdditionalResults(results, queryStr)
     }
 
-    let filings = secData.filings
+    let filings = secData.data
     const filingsByCompany = {}
 
     // Creates separate arrays for each company
@@ -778,7 +809,7 @@ async function main() {
     endDateOfSearch: endDate,
     earliestPeriodOfReport: periodOfReportTracker.earliest.toISOString().split("T")[0],
     latestPeriodOfReport: periodOfReportTracker.latest.toISOString().split("T")[0],
-    filings: []
+    data: []
   }
 
   const fullFilepath = path.join(os.homedir(), "Desktop", "sec_csv", "tempJSON")
@@ -787,7 +818,7 @@ async function main() {
   for (let file of fileList) {
     if (file.match(/\.[json]+$/i)) {
       const obj = JSON.parse(fs.readFileSync(path.join(fullFilepath, file), "utf-8"))
-      fullJSONFilings.filings = fullJSONFilings.filings.concat(obj.filings)
+      fullJSONFilings.data = fullJSONFilings.data.concat(obj.data)
     }
   }
 
@@ -799,7 +830,7 @@ async function main() {
     let tracker = false
     let trimmedCik = cik.toString().replace(/^0+/, '')
 
-    for (filing of fullJSONFilings.filings) {
+    for (filing of fullJSONFilings.data) {
       if (filing.cik.toString() === trimmedCik) {
         tracker = true
       }
