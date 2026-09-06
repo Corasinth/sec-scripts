@@ -80,12 +80,12 @@ function processArgs() {
 
 function getHeadersAndMatrix() {
   let databaseStr = fs.readFileSync(databaseCSVPath, "utf-8")
-
   // Create database matrix
   let databaseMatrix = []
   for (entry of databaseStr.split("\n")) {
     // If escapeDetection is false than we are not detecting that we are inside a quoted string
     // If escapeDetection is true than we are detecting that we are inside a quoted string
+
     let escapeDetection = false
     let rowArr = []
     let tempStr = ''
@@ -107,15 +107,15 @@ function getHeadersAndMatrix() {
     databaseMatrix.push(rowArr)
   }
 
-  // Create neat headerArray
+  // Create neat headerArrays
   let headers = []
   for (entry of databaseMatrix[0]) {
     // Trim spaces around header, replace spaces within header with _, uppercase header, remove line breaks
     headers.push(entry.trim().replace(/\s+/g, '_').toUpperCase().replace(/[\n\r\t]/gm, ""))
   }
   // Add slice to get rid of header row
-  return { headerArray: headers, databaseMatrix: databaseMatrix.slice(1) }
 
+  return { headerArray: headers, databaseMatrix: sanitizeMatrix(databaseMatrix.slice(1)) }
 }
 
 function getDatabaseObj(databaseMatrix) {
@@ -320,8 +320,10 @@ function processFormDataWithDatabase(companyFilingArr) {
     periodOfReportTracker.earliest = new Date(companyFilingArr[companyFilingArr.length - 1].periodOfReport)
   }
 
+  // Old filename — shortened because path lenght char limit was being reached
   // Set filename
-  const filename = `${companyFilingArr[companyFilingArr.length - 1].periodOfReport}_to_${companyFilingArr[0].periodOfReport}_investment_data_${replaceSpaceWithDashAndRemoveSpecialCharacters(companyFilingArr[0].companyName)}_${companyFilingArr[0].cik}.csv`
+  // const filename = `${companyFilingArr[companyFilingArr.length - 1].periodOfReport}_to_${companyFilingArr[0].periodOfReport}_investment_data_${replaceSpaceWithDashAndRemoveSpecialCharacters(companyFilingArr[0].companyName)}_${companyFilingArr[0].cik}.csv`
+  const filename = `${companyFilingArr[companyFilingArr.length - 1].periodOfReport}_to_${companyFilingArr[0].periodOfReport}_${replaceSpaceWithDashAndRemoveSpecialCharacters(companyFilingArr[0].companyName)}_${companyFilingArr[0].cik}.csv`
 
   // Variables for CSV construction
   let csvString = ""
@@ -339,63 +341,51 @@ function processFormDataWithDatabase(companyFilingArr) {
         for (let key in holding) {
           companyFilingObject[holding.cusip][key] = holding[key]
         }
+
         // Prefer mainDatabaseObject issuerNames to sec filing data
         if (!!mainDatabaseObject[holding.cusip]) {
           companyFilingObject[holding.cusip].nameOfIssuer = mainDatabaseObject[holding.cusip][headerArray[0]]
         }
       }
 
+      // Add seperate entries for shares vs PRN
+      let holdingType = holding.shrsOrPrnAmt.sshPrnamtType
+      let shares
+      let prn
+
+      if (holdingType === "SH") {
+        shares = holding.shrsOrPrnAmt.sshPrnamt
+        prn = 0
+      } else if (holdingType === "PRN") {
+        shares = 0
+        prn = holding.shrsOrPrnAmt.sshPrnamt
+      } else {
+        console.log(`\nUnknown holding type "${holding.shrsOrPrnAmt.sshPrnamtType}"!\nNameofIssuer: ${holding.nameOfIssuer}\nCIK: ${holding.cik}\nValue: ${holding.shrsOrPrnAmt.sshPrnamt}\nPeriod of Report: ${companyFilingArr[i].periodOfReport}\n`)
+        process.exit()
+      }
+
       if (companyFilingObject[holding.cusip].dot[currentPeriodOfReport]) {
         // If entry for current period of report already exists, there's some funky reporting. This records the multiple entries under the same CUSIP number
         // companyFilingObject[holding.cusip].dot[currentPeriodOfReport] = { periodOfReport: currentPeriodOfReport, value: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].value}/${holding.value}`, shares: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].shares}/${holding.shrsOrPrnAmt.sshPrnamt}`, holdingType: `${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}/${holding.shrsOrPrnAmt.sshPrnamtType}` }
-        if (companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType !== holding.shrsOrPrnAmt.sshPrnamtType) {
-          console.log(`\nThere is a shares/PRN mismatch for ${companyFilingArr[i].companyName}.\nCIK#:${companyFilingObject[holding.cusip].cik}\nPeriodOfReport:${currentPeriodOfReport}\nPreviously:${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}\nNow:${holding.shrsOrPrnAmt.sshPrnamtType}`)
 
-          fs.appendFile(path.join(os.homedir(), 'Desktop', "sec_csv", `shares_or_PRN_log_${Math.floor((Date.now()/1000)/30)}.txt`), `There is a shares/PRN mismatch for ${companyFilingArr[i].companyName}.\nCIK#:${companyFilingObject[holding.cusip].cik}\nPeriodOfReport:${currentPeriodOfReport}\nPreviously:${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}\nNow:${holding.shrsOrPrnAmt.sshPrnamtType}\n\n`, (err) => {
-            if (err) {
-              console.log(err)
-            } else {
-              // console.log("File appended")
-            }
-          })
-
-          companyFilingObject[holding.cusip].dot[currentPeriodOfReport] = { periodOfReport: currentPeriodOfReport, value: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].value) + Number(holding.value)}`, shares: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].shares) + Number(holding.shrsOrPrnAmt.sshPrnamt)}`, holdingType: `${holding.shrsOrPrnAmt.sshPrnamtType}` }
-          // ${companyFilingObject[holding.cusip].dot[currentPeriodOfReport].holdingType}/
-        } else {
-          companyFilingObject[holding.cusip].dot[currentPeriodOfReport] = { periodOfReport: currentPeriodOfReport, value: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].value) + Number(holding.value)}`, shares: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].shares) + Number(holding.shrsOrPrnAmt.sshPrnamt)}`, holdingType: `${holding.shrsOrPrnAmt.sshPrnamtType}` }
+        companyFilingObject[holding.cusip].dot[currentPeriodOfReport] = {
+          periodOfReport: currentPeriodOfReport,
+          value: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].value) + Number(holding.value)}`,
+          shares: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].shares) + shares}`,
+          prn: `${Number(companyFilingObject[holding.cusip].dot[currentPeriodOfReport].prn) + prn}`
         }
-
 
       } else {
         // dot.{periodOfReport, value, shares, holdingType}
-        companyFilingObject[holding.cusip].dot[currentPeriodOfReport] = { periodOfReport: currentPeriodOfReport, value: holding.value, shares: holding.shrsOrPrnAmt.sshPrnamt, holdingType: holding.shrsOrPrnAmt.sshPrnamtType }
-      }
-
-
-    }
-  }
-  // Quick check at the end to see if the SHARES/PRN value is the same across all periods of report
-  for (let companyCUSIP in companyFilingObject) {
-    let holding = companyFilingObject[companyCUSIP]
-    let holdingDataOverTime = holding.dot
-    
-
-    let holdingTypeSet = new Set()
-
-    for (let periodOfReport in holdingDataOverTime) {
-      holdingTypeSet.add(holdingDataOverTime[periodOfReport]["holdingType"])
-    }
-
-    if (holdingTypeSet.size > 1) {
-      let errorMessage = `The holding type for a company has changed from one period of report to the next.\nCompany Name:${companyFilingArr[0].companyName}\nCompany Invested In:${holding.nameOfIssuer}\nCompany Invested in CIK:${holding.cik}\n\n`
-
-      fs.appendFile(path.join(os.homedir(), 'Desktop', "sec_csv", `shares_or_PRN_overTime_log_${Math.floor((Date.now()/1000)/30)}}.txt`), errorMessage, (err) => {
-        if (err) {
-          console.log(err)
-        } else {
-          // console.log("file appended")
+        companyFilingObject[holding.cusip].dot[currentPeriodOfReport] =
+        {
+          periodOfReport: currentPeriodOfReport,
+          value: holding.value,
+          shares: shares,
+          prn: prn,
         }
-      })
+
+      }
     }
   }
 
@@ -413,6 +403,7 @@ function processFormDataWithDatabase(companyFilingArr) {
     }
     return val
   })
+
 
   // generate sum values
   const sumValue = {}
@@ -437,7 +428,10 @@ function processFormDataWithDatabase(companyFilingArr) {
   // If the current holding has the same CUSIP as an entry in the database, a row is generated for the csv file joining data from sec-api about the holding and investment data from the database
   // Data is taken to identify the company, then provide value and share data for multiple periods of reports, then fill in row data from the database.csv file
   for (const holding of companyFilingArr) {
-    if (mainDatabaseObject[holding.cusip]) {
+    // Need to add quotes because...all cusips in the database are quoted strings, and the maindatabase object creates it's cusip object keys based on the database entries, but the data from the filings doesn't put the cusips in quotes
+    let holdingCUSIP = `"${holding.cusip}"`
+
+    if (mainDatabaseObject[holdingCUSIP]) {
       let quarterDifferenceHeaderString = ""
       // Generate headers for the .csv form only if there's a match and only if we haven't already made the headers
       if (!madeHeaders) {
@@ -450,6 +444,7 @@ function processFormDataWithDatabase(companyFilingArr) {
 
           csvString += `Q${getQuarter(por)}_VALUE,`
           csvString += `Q${getQuarter(por)}_SHARES,`
+          csvString += `Q${getQuarter(por)}_PRN,`
           // csvString += `TYPE,`
 
           if (i !== periodOfReportArray.length - 1) {
@@ -479,18 +474,18 @@ function processFormDataWithDatabase(companyFilingArr) {
 
       // Generate row data
       // Name of Company form database.csv + ticker
-      csvString += `\"${titleCase(mainDatabaseObject[holding.cusip][headerArray[0]].replace(/["'“”‘’]/g, ""))} (${holding.ticker})\"`
+      csvString += `\"${titleCase(mainDatabaseObject[holdingCUSIP][headerArray[0]].replace(/["'“”‘’]/g, ""))} (${holding.ticker})\"`
       csvString += ','
 
       // csvString += holding.cusip
       // csvString += ','
 
       // ISIN—assumed to be the fourth column
-      // csvString += mainDatabaseObject[holding.cusip][headerArray[3]] ?? ""
+      // csvString += mainDatabaseObject[holdingCUSIP][headerArray[3]] ?? ""
       // csvString += ','
 
       // Country—assumed to be the third column
-      csvString += mainDatabaseObject[holding.cusip][headerArray[2]] ?? ""
+      csvString += mainDatabaseObject[holdingCUSIP][headerArray[2]] ?? ""
       csvString += ','
 
       // csvString += holding.cik
@@ -500,15 +495,19 @@ function processFormDataWithDatabase(companyFilingArr) {
       let differenceString = ''
       for (let i = periodOfReportArray.length - 1; i > -1; i--) {
         if (!holding.dot[periodOfReportArray[i]]) {
-          holding.dot[periodOfReportArray[i]] = { periodOfReport: false, value: 0, shares: 0, holdingType: "" }
+          holding.dot[periodOfReportArray[i]] = { periodOfReport: false, value: '0', shares: '0', prn: '0' }
         }
         const por = holding.dot[periodOfReportArray[i]]
+
         sumValue[periodOfReportArray[i]] += Number(por["value"])
 
         // Values
         csvString += `${por["value"]},`
         // Shares
         csvString += `${por["shares"]},`
+        // PRN
+        csvString += `${por["prn"]},`
+        
         // Shares or PRN
         // csvString += `${por["holdingType"]},`
 
@@ -523,13 +522,13 @@ function processFormDataWithDatabase(companyFilingArr) {
 
       csvString += differenceString
 
-      csvString += `\"${mainDatabaseObject[holding.cusip]["sources"]}\",`
+      csvString += `\"${mainDatabaseObject[holdingCUSIP]["sources"]}\",`
 
       // Skip the first four elements of the header array since they're already in place
       for (let i = 4; i < headerArray.length; i++) {
-        csvString += mainDatabaseObject[holding.cusip][headerArray[i]]
+        csvString += mainDatabaseObject[holdingCUSIP][headerArray[i]]
 
-        if ((sumImpact[headerArray[i]] || sumImpact[headerArray[i]] === 0) && mainDatabaseObject[holding.cusip][headerArray[i]] && mainDatabaseObject[holding.cusip][headerArray[i]] !== "?") {
+        if ((sumImpact[headerArray[i]] || sumImpact[headerArray[i]] === 0) && mainDatabaseObject[holdingCUSIP][headerArray[i]] && mainDatabaseObject[holdingCUSIP][headerArray[i]] !== "?") {
           sumImpact[headerArray[i]] += 1
 
           if (i > 8) {
@@ -674,7 +673,8 @@ async function createFoldersAndFilePaths(form) {
   // Creates file paths
   const secFormFilepath = path.join(os.homedir(), 'Desktop', "sec_csv", "Form13F-HR", `${replaceSpaceWithDashAndRemoveSpecialCharacters(form.companyName)}_CIK_${form.cik}_${replaceSpaceWithDashAndRemoveSpecialCharacters(form.formType)}.csv`);
 
-  const queriedDataFilepath = path.join(os.homedir(), 'Desktop', "sec_csv", "Queried_Data", `${replaceSpaceWithDashAndRemoveSpecialCharacters(form.companyName)}_CIK_${form.cik}_Divestment_Analysis.csv`);
+  // const queriedDataFilepath = path.join(os.homedir(), 'Desktop', "sec_csv", "Queried_Data", `${replaceSpaceWithDashAndRemoveSpecialCharacters(form.companyName)}_CIK_${form.cik}_Divestment_Analysis.csv`);
+  const queriedDataFilepath = path.join(os.homedir(), 'Desktop', "sec_csv", "Queried_Data", `${replaceSpaceWithDashAndRemoveSpecialCharacters(form.companyName)}_CIK_${form.cik}.csv`);
 
   // Creates folder on user's Desktop for forms
   fs.mkdirSync(secFormFilepath, { recursive: true }, (e) => {
