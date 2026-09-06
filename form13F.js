@@ -40,8 +40,8 @@ const periodOfReportTracker = {
 // Counter to track how many api calls are made
 let apiCallCounter = 0
 // cikArray = ["(formType:13F AND NOT formType:NT AND periodOfReport:[2025-02-23 TO 2026-02-23]) AND (cik:(944388, 1463559, 899051, 9622, 9631, 1335382, 1335382, 1977794, 1228242, 898286, 1143309, 1283718, 1991835, 2055639, 1045520, 1021926, 1277690, 1421224, 1056527, 831001))"]
-// const testDataFile = ""
-const testDataFile = "rawData_for_13F-HR_2025-09-30_to_2026-08-16_timestamp_2026-08-16.json"
+const testDataFile = ""
+// const testDataFile = "rawData_for_13F-HR_2025-09-30_to_2026-08-16_timestamp_2026-08-16.json"
 
 const cikArray = processArgs()
 // =======================================FUNCTIONS=======================================
@@ -507,7 +507,7 @@ function processFormDataWithDatabase(companyFilingArr) {
         csvString += `${por["shares"]},`
         // PRN
         csvString += `${por["prn"]},`
-        
+
         // Shares or PRN
         // csvString += `${por["holdingType"]},`
 
