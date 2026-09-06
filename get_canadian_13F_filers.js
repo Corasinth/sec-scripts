@@ -20,8 +20,8 @@ let startDate = `${new Date(date.setFullYear(date.getFullYear() - 1, date.getMon
 APICounter = 0
 
 // Change to test file path to use
-const testFile = "./canadian_test_file.json"
-// const testFile = ""
+// const testFile = "./canadian_test_file.json"
+const testFile = ""
 
 // ==========================Functions==========================
 // Uses current date to return query string to search the last 4 quarters
