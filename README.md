@@ -9,8 +9,8 @@ Some scripts to assist with gathering and organizing SEC filing data.
 * [Installation and Usage](#installation-and-usage)
     * [Script: sql-command-generator](#script-sql-command-generator)
     * [Script: sec-to-csv](#script-sec-to-csv)
-    * [Script: form13F.js](#script-form13F.js)
-    * [Script: get_canadian_13F_filers.js](#get_canadian_13F_filers.js)
+    * [Script: form13F.js](#script-form13fjs)
+    * [Script: get_canadian_13F_filers.js](#script-get_canadian_13f_filersjs)
 * [Contributing](#contributing)    
 
 ## Installation and Usage
@@ -35,7 +35,7 @@ To run this script, you need to first install [Node](https://nodejs.org/en/downl
 
 You then need to ensure that the folder containing this script holds a file called `database.csv`. This file must contain comma seperated values, with escaped strings held in quotes. The data is assumed to have a particular set of headers—the first four specifically must be `ISSUER,CUSIP,COUNTRY,ISIN`. Failure of any of these conditions will result in an error or incorrect output.
 
-Open a terminal window in the folder that contains this script. You can do that by opening any terminal, like Powershell or Command Prompt, and navigating to this folder using the `cd` command. For example, this command will take you to your Desktop:
+Open a terminal window in the folder that contains this script. You can do that by opening any terminal, like Powershell or Command Prompt, and navigating to this folder using the  `cd` command. For example, this command will take you to your Desktop:
 ```shell
 cd ~/Desktop
 ``` 
